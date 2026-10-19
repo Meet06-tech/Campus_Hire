@@ -1,0 +1,51 @@
+# ==========================================
+# Java / Maven - Spring Boot
+# ==========================================
+backend/target/
+*.class
+*.log
+
+# ==========================================
+# Flutter / Dart
+# ==========================================
+flutter_app/.dart_tool/
+flutter_app/.packages
+flutter_app/.flutter-plugins
+flutter_app/.flutter-plugins-dependencies
+flutter_app/build/
+flutter_app/.pub-cache/
+flutter_app/ios/Pods/
+flutter_app/coverage/
+
+# ==========================================
+# Local environment and secrets
+# ==========================================
+.env
+.env.*
+!.env.example
+*.local
+
+# Local Spring Boot configuration
+application-local.properties
+application-local.yml
+application-local.yaml
+
+# Private keys and certificates
+*.pem
+*.key
+*.p12
+*.jks
+
+# ==========================================
+# IDE and operating system
+# ==========================================
+.idea/
+.vscode/
+*.iml
+.DS_Store
+
+# ==========================================
+# Temporary files
+# ==========================================
+*.tmp
+*.swp
