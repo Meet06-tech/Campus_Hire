@@ -8,7 +8,10 @@ This repository contains the first runnable skeleton of the Placement Management
 - Flutter application shell in `flutter_app/`
 - PostgreSQL configuration through environment variables
 - Backend health endpoint: `GET /api/health`
-- No login, business rules, or database tables yet
+- Student registration and login endpoints
+- BCrypt password hashing and JWT authentication foundation
+- A `user_accounts` PostgreSQL table created automatically by Hibernate
+- No placement business features yet
 
 ## Java 21 setup
 
@@ -38,9 +41,17 @@ Optional database variables for later database-backed features:
 export DB_URL=jdbc:postgresql://localhost:5432/placement_management
 export DB_USERNAME=postgres
 export DB_PASSWORD=your-local-password
+export JWT_SECRET=replace-with-a-long-random-local-secret
 ```
 
 Secrets should stay in your local shell or an uncommitted `.env` file.
+
+Authentication endpoints:
+
+- `POST /api/auth/register` with `fullName`, `enrollmentNumber`, `universityEmail`, and `password`
+- `POST /api/auth/login` with `enrollmentNumber` and `password`
+
+Both successful requests return a JWT token. Send it on later protected requests as `Authorization: Bearer <token>`.
 
 ## Run the Flutter shell
 
