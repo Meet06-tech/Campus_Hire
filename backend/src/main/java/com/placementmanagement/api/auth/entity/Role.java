@@ -1,4 +1,4 @@
-package com.placementmanagement.api.auth;
+package com.placementmanagement.api.auth.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

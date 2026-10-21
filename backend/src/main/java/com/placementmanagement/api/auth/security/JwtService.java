@@ -1,4 +1,4 @@
-package com.placementmanagement.api.auth;
+package com.placementmanagement.api.auth.security;
 
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+
+import com.placementmanagement.api.auth.entity.UserAccount;
 
 @Service
 public class JwtService {

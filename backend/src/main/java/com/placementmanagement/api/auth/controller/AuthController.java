@@ -1,4 +1,4 @@
-package com.placementmanagement.api.auth;
+package com.placementmanagement.api.auth.controller;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -7,9 +7,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.placementmanagement.api.auth.AuthDtos.AuthResponse;
-import com.placementmanagement.api.auth.AuthDtos.LoginRequest;
-import com.placementmanagement.api.auth.AuthDtos.RegisterRequest;
+import com.placementmanagement.api.auth.dto.AuthDtos.AuthResponse;
+import com.placementmanagement.api.auth.dto.AuthDtos.LoginRequest;
+import com.placementmanagement.api.auth.dto.AuthDtos.RegisterRequest;
+import com.placementmanagement.api.auth.service.AuthService;
 
 @RestController
 @RequestMapping("/api/auth")
