@@ -1,4 +1,4 @@
-package com.placementmanagement.api.auth;
+package com.placementmanagement.api.auth.dto;
 
 public final class AuthDtos {
     private AuthDtos() {}

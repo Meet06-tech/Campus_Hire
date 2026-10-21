@@ -1,4 +1,4 @@
-package com.placementmanagement.api.auth;
+package com.placementmanagement.api.auth.security;
 
 import java.io.IOException;
 import java.util.List;
@@ -13,6 +13,9 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+
+import com.placementmanagement.api.auth.entity.UserAccount;
+import com.placementmanagement.api.auth.repository.UserAccountRepository;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {

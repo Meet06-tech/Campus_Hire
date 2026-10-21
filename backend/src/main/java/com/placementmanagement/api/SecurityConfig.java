@@ -12,7 +12,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-import com.placementmanagement.api.auth.JwtAuthenticationFilter;
+import com.placementmanagement.api.auth.security.JwtAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
@@ -30,7 +30,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
-                        .requestMatchers("/api/auth/**", "/api/health", "/actuator/health").permitAll()
+                        .requestMatchers("/api/auth/**", "/api/health", "/actuator/health", "/api/me").permitAll()
                         .anyRequest().authenticated())
                 .httpBasic(basic -> basic.disable())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
