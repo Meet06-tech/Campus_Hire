@@ -64,6 +64,7 @@ public class UserAccount {
     public boolean isEnabled() { return enabled; }
     public Instant getCreatedAt() { return createdAt; }
 
+    public void updateFullName(String fullName) { this.fullName = fullName; }
     public void setRole(Role role) { this.role = role; }
     public void setStudent(Student student) { this.student = student; }
 }

@@ -2,6 +2,7 @@
 # Java / Maven - Spring Boot
 # ==========================================
 backend/target/
+backend/var/uploads/
 *.class
 *.log
 

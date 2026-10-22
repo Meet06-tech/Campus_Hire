@@ -53,6 +53,19 @@ Authentication endpoints:
 
 Both successful requests return a JWT token. Send it on later protected requests as `Authorization: Bearer <token>`.
 
+## Student profile photos
+
+Profile photos are stored by the backend outside the source tree under
+`./var/uploads/profile-photos` by default. Set `PROFILE_PHOTO_STORAGE_DIR` to
+an absolute or deployment-specific directory when needed. The server accepts
+validated JPEG and PNG images up to 5 MB; the database stores only a generated
+relative photo key. The upload directory is intentionally git-ignored.
+
+Before starting the backend after this feature is applied, the database owner
+must run `backend/src/main/resources/db/migration/V3__add_student_profile_photo_key.sql`
+against the existing database. Hibernate remains configured with
+`ddl-auto=validate` and will not create the column automatically.
+
 ## Run the Flutter shell
 
 ```bash
