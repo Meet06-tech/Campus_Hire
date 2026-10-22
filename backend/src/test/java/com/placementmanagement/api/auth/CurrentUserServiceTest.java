@@ -124,4 +124,30 @@ class CurrentUserServiceTest {
         verify(users, never()).save(any());
         verify(students, never()).save(any());
     }
+
+    @Test
+    void returnsAssignedUserDepartmentForStaffWithoutStudentProfile() {
+        when(user.getRole()).thenReturn(UserRole.DTPO);
+        when(user.getStudent()).thenReturn(null);
+        when(user.getDepartment()).thenReturn(department);
+
+        MeResponse response = service.currentUser(authentication);
+
+        assertEquals("MCA", response.department().code());
+        assertEquals(null, response.enrollmentNumber());
+        assertEquals(null, response.profile());
+    }
+
+    @Test
+    void returnsNullDepartmentForUniversityTpoWithoutAssignment() {
+        when(user.getRole()).thenReturn(UserRole.UTPO);
+        when(user.getStudent()).thenReturn(null);
+        when(user.getDepartment()).thenReturn(null);
+
+        MeResponse response = service.currentUser(authentication);
+
+        assertEquals("UTPO", response.role());
+        assertEquals(null, response.department());
+        assertEquals(null, response.enrollmentNumber());
+    }
 }

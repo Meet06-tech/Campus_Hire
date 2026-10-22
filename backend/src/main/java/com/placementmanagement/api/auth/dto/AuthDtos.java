@@ -9,13 +9,29 @@ public final class AuthDtos {
             String universityEmail,
             String password) {}
 
-    public record LoginRequest(String enrollmentNumber, String password) {}
+    /**
+     * enrollmentNumber is retained for the existing student client contract.
+     * Staff clients may send identifier instead, using the provisioned university email.
+     */
+    public record LoginRequest(String enrollmentNumber, String password, String identifier) {
+        public LoginRequest(String enrollmentNumber, String password) {
+            this(enrollmentNumber, password, null);
+        }
+    }
 
     public record AuthResponse(
             String token,
             String userId,
             String fullName,
             String enrollmentNumber,
-            String role) {}
+            String role,
+            DepartmentInfo department) {
+        public AuthResponse(String token, String userId, String fullName,
+                String enrollmentNumber, String role) {
+            this(token, userId, fullName, enrollmentNumber, role, null);
+        }
+    }
+
+    public record DepartmentInfo(Long id, String code, String name) {}
 }
 

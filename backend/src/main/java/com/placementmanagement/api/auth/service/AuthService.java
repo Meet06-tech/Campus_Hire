@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.placementmanagement.api.auth.dto.AuthDtos.AuthResponse;
+import com.placementmanagement.api.auth.dto.AuthDtos.DepartmentInfo;
 import com.placementmanagement.api.auth.dto.AuthDtos.LoginRequest;
 import com.placementmanagement.api.auth.dto.AuthDtos.RegisterRequest;
 import com.placementmanagement.api.auth.entity.Department;
@@ -29,11 +30,13 @@ public class AuthService {
     private final RoleRepository roles;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final StaffEmailAllowlist staffEmailAllowlist;
 
     public AuthService(UserAccountRepository users, StudentRepository students,
             DepartmentEmailCodeRepository departmentEmailCodes,
             UniversityEmailParser emailParser, RoleRepository roles,
-            PasswordEncoder passwordEncoder, JwtService jwtService) {
+            PasswordEncoder passwordEncoder, JwtService jwtService,
+            StaffEmailAllowlist staffEmailAllowlist) {
         this.users = users;
         this.students = students;
         this.departmentEmailCodes = departmentEmailCodes;
@@ -41,6 +44,7 @@ public class AuthService {
         this.roles = roles;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.staffEmailAllowlist = staffEmailAllowlist;
     }
 
     @Transactional
@@ -73,18 +77,53 @@ public class AuthService {
     }
 
     public AuthResponse login(LoginRequest request) {
-        UserAccount user = users.findByStudentEnrollmentNumber(required(request.enrollmentNumber(), "Enrollment number"))
+        if (request == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Login request is required");
+        }
+        boolean hasEnrollment = request.enrollmentNumber() != null && !request.enrollmentNumber().isBlank();
+        boolean hasIdentifier = request.identifier() != null && !request.identifier().isBlank();
+        if (hasEnrollment == hasIdentifier) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Provide exactly one of enrollmentNumber or identifier");
+        }
+        String identifier = hasIdentifier
+                ? required(request.identifier(), "Identifier")
+                : required(request.enrollmentNumber(), "Enrollment number");
+        java.util.Optional<UserAccount> candidate = hasIdentifier
+                ? findStaffByEmail(identifier)
+                : users.findByStudentEnrollmentNumber(identifier);
+        UserAccount user = candidate
                 .filter(UserAccount::isEnabled)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials"));
         if (!passwordEncoder.matches(required(request.password(), "Password"), user.getPasswordHash())) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
         }
-        return response(user);
+        return response(user, supportedRole(user));
     }
 
     private AuthResponse response(UserAccount user) {
+        return response(user, supportedRole(user));
+    }
+
+    private AuthResponse response(UserAccount user, UserRole role) {
         return new AuthResponse(jwtService.createToken(user), user.getId().toString(), user.getFullName(),
-                user.getStudent().getEnrollmentNumber(), user.getRole().name());
+                user.getStudent() == null ? null : user.getStudent().getEnrollmentNumber(), role.name(),
+                user.getDepartment() == null ? null
+                        : new DepartmentInfo(user.getDepartment().getId(), user.getDepartment().getCode(),
+                                user.getDepartment().getName()));
+    }
+
+    private java.util.Optional<UserAccount> findStaffByEmail(String identifier) {
+        if (!staffEmailAllowlist.isAllowed(identifier)) return java.util.Optional.empty();
+        return users.findByUniversityEmailIgnoreCase(identifier.toLowerCase());
+    }
+
+    private UserRole supportedRole(UserAccount user) {
+        try {
+            return user.getRole();
+        } catch (RuntimeException exception) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
+        }
     }
 
     private String required(String value, String field) {

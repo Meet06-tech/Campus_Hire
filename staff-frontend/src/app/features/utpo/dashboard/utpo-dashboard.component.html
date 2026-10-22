@@ -1,0 +1,52 @@
+<div class="dashboard-layout">
+  <nav class="topbar">
+    <div class="brand">
+      <h1>CampusHire</h1>
+      <span class="role-badge utpo">UTPO</span>
+    </div>
+    <div class="user-area">
+      @if (user()) {
+        <span class="user-name">{{ user()!.fullName }}</span>
+      }
+      <button class="logout-btn" (click)="logout()">Sign Out</button>
+    </div>
+  </nav>
+
+  <main class="dashboard-content">
+    @if (loading()) {
+      <div class="loading">Loading dashboard…</div>
+    } @else if (user()) {
+      <div class="welcome-section">
+        <h2>Welcome, {{ user()!.fullName }}</h2>
+        <p class="subtitle">University Training &amp; Placement Officer</p>
+      </div>
+
+      <div class="info-cards">
+        <div class="card">
+          <h3>Profile</h3>
+          <div class="card-row">
+            <span class="label">Email</span>
+            <span class="value">{{ user()!.universityEmail }}</span>
+          </div>
+          <div class="card-row">
+            <span class="label">Role</span>
+            <span class="value">{{ user()!.role }}</span>
+          </div>
+          <div class="card-row">
+            <span class="label">Department</span>
+            <span class="value">{{ user()!.department ? user()!.department!.name : 'University-wide (all departments)' }}</span>
+          </div>
+          <div class="card-row">
+            <span class="label">Status</span>
+            <span class="value status-active">Active</span>
+          </div>
+        </div>
+
+        <div class="card placeholder-card">
+          <h3>Quick Actions</h3>
+          <p class="placeholder-text">Dashboard features such as placement drive management, company approvals, and analytics will appear here.</p>
+        </div>
+      </div>
+    }
+  </main>
+</div>

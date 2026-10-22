@@ -1,0 +1,160 @@
+.dashboard-layout {
+  min-height: 100vh;
+  background: #f3f4f6;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #1e3a5f;
+  color: #fff;
+  padding: 0.75rem 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+
+    h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin: 0;
+    }
+  }
+
+  .user-area {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+
+    .user-name {
+      font-size: 0.9rem;
+      opacity: 0.9;
+    }
+  }
+}
+
+.role-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+
+  &.utpo {
+    background: #3b82f6;
+    color: #fff;
+  }
+
+  &.dtpo {
+    background: #10b981;
+    color: #fff;
+  }
+}
+
+.logout-btn {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  padding: 0.4rem 1rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.2s;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.25);
+  }
+}
+
+.dashboard-content {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+.welcome-section {
+  margin-bottom: 2rem;
+
+  h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0 0 0.25rem;
+  }
+
+  .subtitle {
+    color: #6b7280;
+    margin: 0;
+    font-size: 0.95rem;
+  }
+}
+
+.info-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+
+  h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #374151;
+    margin: 0 0 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #e5e7eb;
+  }
+}
+
+.card-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+
+  &:not(:last-child) {
+    border-bottom: 1px solid #f3f4f6;
+  }
+
+  .label {
+    font-size: 0.85rem;
+    color: #6b7280;
+  }
+
+  .value {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #1f2937;
+  }
+}
+
+.status-active {
+  color: #059669 !important;
+}
+
+.placeholder-card {
+  .placeholder-text {
+    color: #9ca3af;
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+}
+
+.loading {
+  text-align: center;
+  color: #6b7280;
+  padding: 3rem 0;
+  font-size: 1rem;
+}

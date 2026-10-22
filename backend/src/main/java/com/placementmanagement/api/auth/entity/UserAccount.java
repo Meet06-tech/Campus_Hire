@@ -37,6 +37,10 @@ public class UserAccount {
     @JoinColumn(name = "role_id", nullable = false)
     private Role role;
 
+    @ManyToOne
+    @JoinColumn(name = "department_id")
+    private Department department;
+
     @OneToOne(mappedBy = "user")
     private Student student;
 
@@ -60,12 +64,14 @@ public class UserAccount {
     public String getUniversityEmail() { return universityEmail; }
     public String getPasswordHash() { return passwordHash; }
     public Student getStudent() { return student; }
+    public Department getDepartment() { return department; }
     public UserRole getRole() { return UserRole.valueOf(role.getRoleCode()); }
     public boolean isEnabled() { return enabled; }
     public Instant getCreatedAt() { return createdAt; }
 
     public void updateFullName(String fullName) { this.fullName = fullName; }
     public void setRole(Role role) { this.role = role; }
+    public void setDepartment(Department department) { this.department = department; }
     public void setStudent(Student student) { this.student = student; }
 }
 

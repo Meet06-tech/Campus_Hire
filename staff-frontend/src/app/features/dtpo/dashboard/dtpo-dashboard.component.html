@@ -1,0 +1,56 @@
+<div class="dashboard-layout">
+  <nav class="topbar">
+    <div class="brand">
+      <h1>CampusHire</h1>
+      <span class="role-badge dtpo">DTPO</span>
+    </div>
+    <div class="user-area">
+      @if (user()) {
+        <span class="user-name">{{ user()!.fullName }}</span>
+      }
+      <button class="logout-btn" (click)="logout()">Sign Out</button>
+    </div>
+  </nav>
+
+  <main class="dashboard-content">
+    @if (loading()) {
+      <div class="loading">Loading dashboard…</div>
+    } @else if (user()) {
+      <div class="welcome-section">
+        <h2>Welcome, {{ user()!.fullName }}</h2>
+        @if (user()!.department) {
+          <p class="subtitle">Department Training &amp; Placement Officer — {{ user()!.department!.name }}</p>
+        }
+      </div>
+
+      <div class="info-cards">
+        <div class="card">
+          <h3>Profile</h3>
+          <div class="card-row">
+            <span class="label">Email</span>
+            <span class="value">{{ user()!.universityEmail }}</span>
+          </div>
+          <div class="card-row">
+            <span class="label">Role</span>
+            <span class="value">{{ user()!.role }}</span>
+          </div>
+          @if (user()!.department) {
+            <div class="card-row">
+              <span class="label">Department</span>
+              <span class="value">{{ user()!.department!.code }} — {{ user()!.department!.name }}</span>
+            </div>
+          }
+          <div class="card-row">
+            <span class="label">Status</span>
+            <span class="value status-active">Active</span>
+          </div>
+        </div>
+
+        <div class="card placeholder-card">
+          <h3>Department Actions</h3>
+          <p class="placeholder-text">Department-scoped features such as student placement tracking, interview scheduling, and departmental reports will appear here.</p>
+        </div>
+      </div>
+    }
+  </main>
+</div>

@@ -49,14 +49,16 @@ public class CurrentUserService {
                 .filter(UserAccount::isEnabled)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication is invalid"));
         Student student = user.getStudent();
-        DepartmentResponse department = student == null ? null : department(student.getDepartment());
+        DepartmentResponse department = student != null
+                ? department(student.getDepartment())
+                : department(user.getDepartment());
 
         return new MeResponse(
                 user.getId(),
                 user.getFullName(),
                 user.getUniversityEmail(),
                 student == null ? null : student.getEnrollmentNumber(),
-                user.getRole().name(),
+                supportedRole(user).name(),
                 user.isEnabled(),
                 department,
                 profile(student),
@@ -125,11 +127,21 @@ public class CurrentUserService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication is required");
         }
         try {
-            return users.findById(Long.valueOf(authentication.getName()))
+            UserAccount user = users.findById(Long.valueOf(authentication.getName()))
                     .filter(UserAccount::isEnabled)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication is invalid"));
+            supportedRole(user);
+            return user;
         } catch (NumberFormatException exception) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid authentication subject");
+        }
+    }
+
+    private UserRole supportedRole(UserAccount user) {
+        try {
+            return user.getRole();
+        } catch (RuntimeException exception) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication is invalid");
         }
     }
 
