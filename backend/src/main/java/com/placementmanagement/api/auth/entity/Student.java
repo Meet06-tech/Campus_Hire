@@ -3,6 +3,9 @@ package com.placementmanagement.api.auth.entity;
 import com.placementmanagement.api.auth.entity.Department;
 import com.placementmanagement.api.auth.entity.UserAccount;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -32,6 +35,33 @@ public class Student {
     @JoinColumn(name = "department_id", nullable = false)
     private Department department;
 
+    @Column(name = "admission_year")
+    private Short admissionYear;
+
+    @Column(name = "graduation_year")
+    private Short graduationYear;
+
+    @Column(name = "date_of_birth")
+    private LocalDate dateOfBirth;
+
+    @Column(name = "phone_number")
+    private String phoneNumber;
+
+    @Column(name = "academic_program")
+    private String academicProgram;
+
+    @Column(name = "current_semester")
+    private Short currentSemester;
+
+    @Column(name = "cgpa")
+    private BigDecimal cgpa;
+
+    @Column(name = "career_profile")
+    private String careerProfile;
+
+    @Column(name = "profile_photo_key", length = 255)
+    private String profilePhotoKey;
+
     protected Student() {
     }
 
@@ -46,4 +76,30 @@ public class Student {
     public UserAccount getUser() { return user; }
     public String getEnrollmentNumber() { return enrollmentNumber; }
     public Department getDepartment() { return department; }
+    public Short getAdmissionYear() { return admissionYear; }
+    public Short getGraduationYear() { return graduationYear; }
+    public LocalDate getDateOfBirth() { return dateOfBirth; }
+    public String getPhoneNumber() { return phoneNumber; }
+    public String getAcademicProgram() { return academicProgram; }
+    public Short getCurrentSemester() { return currentSemester; }
+    public BigDecimal getCgpa() { return cgpa; }
+    public String getCareerProfile() { return careerProfile; }
+    public String getProfilePhotoKey() { return profilePhotoKey; }
+
+    public void updateProfile(Short admissionYear, Short graduationYear, LocalDate dateOfBirth,
+            String phoneNumber, String academicProgram, Short currentSemester,
+            BigDecimal cgpa, String careerProfile) {
+        this.admissionYear = admissionYear;
+        this.graduationYear = graduationYear;
+        this.dateOfBirth = dateOfBirth;
+        this.phoneNumber = phoneNumber;
+        this.academicProgram = academicProgram;
+        this.currentSemester = currentSemester;
+        this.cgpa = cgpa;
+        this.careerProfile = careerProfile;
+    }
+
+    public void updateProfilePhotoKey(String profilePhotoKey) {
+        this.profilePhotoKey = profilePhotoKey;
+    }
 }
