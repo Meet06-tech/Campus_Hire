@@ -1,0 +1,178 @@
+import { CommonModule } from '@angular/common';
+import { Component, Input, OnInit, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { forkJoin } from 'rxjs';
+
+import { AuthService } from '../../../core/services/auth.service';
+import { PlacementService } from '../../../core/services/placement.service';
+import { MeResponse, StaffRole } from '../../../core/models/auth.models';
+import { Company, CompanyRequest, DashboardSummary, DriveRequest, PlacementDrive, StaffApplication, StaffStudent } from '../../../core/models/placement.models';
+
+type DashboardSection = 'overview' | 'drives' | 'companies' | 'applications' | 'students' | 'reports';
+
+interface DashboardNavItem {
+  id: DashboardSection;
+  label: string;
+  icon: string;
+}
+
+interface DashboardMetric {
+  label: string;
+  value: string;
+  helper: string;
+  tone: 'blue' | 'green' | 'amber' | 'slate';
+}
+
+@Component({
+  selector: 'app-staff-dashboard',
+  standalone: true,
+  imports: [CommonModule, FormsModule],
+  templateUrl: './staff-dashboard.component.html',
+  styleUrl: './staff-dashboard.component.scss'
+})
+export class StaffDashboardComponent implements OnInit {
+  @Input({ required: true }) role!: StaffRole;
+
+  readonly navItems: DashboardNavItem[] = [
+    { id: 'overview', label: 'Overview', icon: '⌂' },
+    { id: 'drives', label: 'Placement drives', icon: '▣' },
+    { id: 'companies', label: 'Companies', icon: '◈' },
+    { id: 'applications', label: 'Applied students', icon: '✓' },
+    { id: 'students', label: 'Students', icon: '♙' },
+    { id: 'reports', label: 'Reports', icon: '▥' }
+  ];
+
+  user = signal<MeResponse | null>(null);
+  companies = signal<Company[]>([]);
+  drives = signal<PlacementDrive[]>([]);
+  applications = signal<StaffApplication[]>([]);
+  students = signal<StaffStudent[]>([]);
+  summary = signal<DashboardSummary | null>(null);
+  activeSection = signal<DashboardSection>('overview');
+  loading = signal(true);
+  saving = signal(false);
+  errorMessage = signal<string | null>(null);
+  successMessage = signal<string | null>(null);
+  showCompanyForm = signal(false);
+  showDriveForm = signal(false);
+  searchTerm = signal('');
+  statusFilter = signal('ALL');
+
+  companyForm: CompanyRequest = this.emptyCompany();
+  driveForm: DriveRequest = this.emptyDrive();
+
+  constructor(private authService: AuthService, private placementService: PlacementService) {}
+
+  ngOnInit(): void {
+    forkJoin({
+      user: this.authService.me(),
+      companies: this.placementService.listCompanies(),
+      drives: this.placementService.listDrives(),
+      applications: this.placementService.listApplications(0, 100),
+      students: this.placementService.listStudents(0, 100),
+      summary: this.placementService.dashboardSummary()
+    }).subscribe({
+      next: ({ user, companies, drives, applications, students, summary }) => {
+        this.user.set(user);
+        this.companies.set(companies);
+        this.drives.set(drives);
+        this.applications.set(applications.items);
+        this.students.set(students.items);
+        this.summary.set(summary);
+        this.loading.set(false);
+      },
+      error: (error: { status?: number }) => {
+        this.loading.set(false);
+        if (error.status === 401) this.authService.logout();
+        else this.errorMessage.set('Unable to load the dashboard. Please try again.');
+      }
+    });
+  }
+
+  nav(section: DashboardSection): void {
+    this.activeSection.set(section);
+    this.errorMessage.set(null);
+    this.successMessage.set(null);
+  }
+
+  get roleLabel(): string { return this.role === 'DTPO' ? 'Department TPO' : 'University TPO'; }
+  get scopeLabel(): string { return this.role === 'DTPO' ? (this.user()?.department?.name ?? 'Assigned department') : 'All departments'; }
+  companyDriveCount(companyId: number): number { return this.drives().filter(drive => drive.company.id === companyId).length; }
+  conversionRate(): number { const total = this.summary()?.applications ?? 0; return total === 0 ? 0 : Math.round(((this.summary()?.selectedApplications ?? 0) / total) * 100); }
+  studentParticipationRate(): number { const total = this.summary()?.students ?? 0; return total === 0 ? 0 : Math.round(((this.summary()?.studentsWithApplications ?? 0) / total) * 100); }
+
+  metrics(): DashboardMetric[] {
+    const summary = this.summary();
+    if (!summary) return [];
+    return [
+      { label: 'Placement drives', value: String(summary.drives), helper: `${summary.publishedDrives} published`, tone: 'blue' },
+      { label: 'Companies', value: String(summary.companies), helper: 'Available in this workspace', tone: 'green' },
+      { label: 'Applications', value: String(summary.applications), helper: `${summary.selectedApplications} selected`, tone: 'amber' },
+      { label: 'Students tracked', value: String(summary.students), helper: 'Scoped to your access', tone: 'slate' }
+    ];
+  }
+
+  filteredDrives(): PlacementDrive[] {
+    const query = this.searchTerm().trim().toLowerCase();
+    const status = this.statusFilter();
+    return this.drives().filter(drive => {
+      const matchesStatus = status === 'ALL' || drive.status === status;
+      const matchesQuery = !query || drive.title.toLowerCase().includes(query) || drive.company.name.toLowerCase().includes(query);
+      return matchesStatus && matchesQuery;
+    });
+  }
+
+  submitCompany(): void {
+    if (!this.companyForm.name.trim()) {
+      this.errorMessage.set('Company name is required.');
+      return;
+    }
+    this.startSave();
+    this.placementService.createCompany(this.companyForm).subscribe({
+      next: company => {
+        this.companies.update(items => [...items, company]);
+        this.companyForm = this.emptyCompany();
+        this.showCompanyForm.set(false);
+        this.finishSave('Company created successfully.');
+      },
+      error: () => this.failSave('Company could not be created. Check the details and try again.')
+    });
+  }
+
+  submitDrive(): void {
+    if (!this.driveForm.companyId || !this.driveForm.title.trim() || !this.driveForm.applicationDeadline || !this.driveForm.jobDescription.trim() || !this.driveForm.location.trim() || !this.driveForm.packageSalary.trim()) {
+      this.errorMessage.set('Complete the required drive fields before saving.');
+      return;
+    }
+    this.startSave();
+    const request = { ...this.driveForm, departmentId: this.role === 'DTPO' ? null : this.driveForm.departmentId, applicationDeadline: this.toInstant(this.driveForm.applicationDeadline) };
+    this.placementService.createDrive(request).subscribe({
+      next: drive => {
+        this.drives.update(items => [...items, drive]);
+        this.driveForm = this.emptyDrive();
+        this.showDriveForm.set(false);
+        this.finishSave('Placement drive created as a draft.');
+      },
+      error: () => this.failSave('Placement drive could not be created. Confirm the active academic year and required fields.')
+    });
+  }
+
+  publishDrive(drive: PlacementDrive): void {
+    this.startSave();
+    this.placementService.publishDrive(drive.id).subscribe({
+      next: published => {
+        this.drives.update(items => items.map(item => item.id === published.id ? published : item));
+        this.finishSave('Placement drive published successfully.');
+      },
+      error: () => this.failSave('This drive could not be published. It may no longer be a draft or may fail backend validation.')
+    });
+  }
+
+  private startSave(): void { this.saving.set(true); this.errorMessage.set(null); this.successMessage.set(null); }
+  private finishSave(message: string): void { this.saving.set(false); this.successMessage.set(message); }
+  private failSave(message: string): void { this.saving.set(false); this.errorMessage.set(message); }
+  private toInstant(date: string): string { return new Date(`${date}T23:59:59`).toISOString(); }
+  private emptyCompany(): CompanyRequest { return { name: '', description: '', website: '', hrContactName: '', hrContactEmail: '', hrContactPhone: '' }; }
+  private emptyDrive(): DriveRequest { return { companyId: 0, departmentId: null, title: '', jobDescription: '', jobType: 'ONSITE', location: '', packageSalary: '', applicationDeadline: '', minimumCgpa: null, graduationYear: null, maximumActiveBacklogs: null, eligibleProgramIds: [] }; }
+  logout(): void { this.authService.logout(); }
+}

@@ -9,6 +9,7 @@ import org.springframework.web.server.ResponseStatusException;
 import com.placementmanagement.api.auth.dto.AuthDtos.AuthResponse;
 import com.placementmanagement.api.auth.dto.AuthDtos.LoginRequest;
 import com.placementmanagement.api.auth.dto.AuthDtos.RegisterRequest;
+import com.placementmanagement.api.auth.dto.AuthDtos.DepartmentInfo;
 import com.placementmanagement.api.auth.entity.Department;
 import com.placementmanagement.api.auth.entity.DepartmentEmailCode;
 import com.placementmanagement.api.auth.entity.Student;
@@ -73,18 +74,32 @@ public class AuthService {
     }
 
     public AuthResponse login(LoginRequest request) {
-        UserAccount user = users.findByStudentEnrollmentNumber(required(request.enrollmentNumber(), "Enrollment number"))
+        if (request == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Login request is required");
+        }
+        boolean hasIdentifier = request.identifier() != null && !request.identifier().isBlank();
+        boolean hasEnrollment = request.enrollmentNumber() != null && !request.enrollmentNumber().isBlank();
+        if (hasIdentifier == hasEnrollment) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Provide exactly one of identifier or enrollmentNumber");
+        }
+        String password = required(request.password(), "Password");
+        UserAccount user = (hasIdentifier
+                ? users.findByUniversityEmailIgnoreCase(required(request.identifier(), "Identifier"))
+                : users.findByStudentEnrollmentNumber(required(request.enrollmentNumber(), "Enrollment number")))
                 .filter(UserAccount::isEnabled)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials"));
-        if (!passwordEncoder.matches(required(request.password(), "Password"), user.getPasswordHash())) {
+        if (!passwordEncoder.matches(password, user.getPasswordHash())) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
         }
         return response(user);
     }
 
     private AuthResponse response(UserAccount user) {
+        Department department = user.getDepartment();
         return new AuthResponse(jwtService.createToken(user), user.getId().toString(), user.getFullName(),
-                user.getStudent().getEnrollmentNumber(), user.getRole().name());
+                user.getStudent() == null ? null : user.getStudent().getEnrollmentNumber(), user.getRole().name(),
+                department == null ? null : new DepartmentInfo(department.getId(), department.getCode(), department.getName()));
     }
 
     private String required(String value, String field) {

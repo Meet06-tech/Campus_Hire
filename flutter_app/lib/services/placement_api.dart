@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
 import '../models/student_profile.dart';
+import '../models/placement_models.dart';
 
 class ApiException implements Exception {
   const ApiException(this.message, this.statusCode);
@@ -58,13 +59,18 @@ class PlacementApi {
   }
 
   Future<Map<String, dynamic>> uploadProfilePhoto(XFile file) async {
-    final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/me/profile-photo'));
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('$baseUrl/me/profile-photo'),
+    );
     if (_token != null) request.headers['Authorization'] = 'Bearer $_token';
-    request.files.add(http.MultipartFile.fromBytes(
-      'file',
-      await file.readAsBytes(),
-      filename: file.name,
-    ));
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'file',
+        await file.readAsBytes(),
+        filename: file.name,
+      ),
+    );
     final response = await request.send();
     final text = await response.stream.bytesToString();
     final decoded = text.isEmpty ? <String, dynamic>{} : jsonDecode(text);
@@ -81,7 +87,10 @@ class PlacementApi {
   Future<Uint8List?> fetchProfilePhoto() async {
     final headers = <String, String>{};
     if (_token != null) headers['Authorization'] = 'Bearer $_token';
-    final response = await http.get(Uri.parse('$baseUrl/me/profile-photo'), headers: headers);
+    final response = await http.get(
+      Uri.parse('$baseUrl/me/profile-photo'),
+      headers: headers,
+    );
     if (response.statusCode == 404) return null;
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw ApiException('Could not load profile photo', response.statusCode);
@@ -92,23 +101,84 @@ class PlacementApi {
   Future<void> removeProfilePhoto() async {
     final headers = <String, String>{};
     if (_token != null) headers['Authorization'] = 'Bearer $_token';
-    final response = await http.delete(Uri.parse('$baseUrl/me/profile-photo'), headers: headers);
+    final response = await http.delete(
+      Uri.parse('$baseUrl/me/profile-photo'),
+      headers: headers,
+    );
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      final decoded = response.body.isEmpty ? <String, dynamic>{} : jsonDecode(response.body);
+      final decoded = response.body.isEmpty
+          ? <String, dynamic>{}
+          : jsonDecode(response.body);
       final data = decoded is Map ? Map<String, dynamic>.from(decoded) : {};
       throw ApiException(
-        (data['detail'] ?? data['message'] ?? 'Photo removal failed').toString(),
+        (data['detail'] ?? data['message'] ?? 'Photo removal failed')
+            .toString(),
         response.statusCode,
       );
     }
+  }
+
+  Future<List<PlacementDrive>> fetchStudentDrives() async {
+    final response = await _requestJson('GET', '/placement/student/drives');
+    if (response is! List)
+      throw const ApiException('Invalid drives response', 200);
+    return response
+        .map(
+          (item) =>
+              PlacementDrive.fromJson(Map<String, dynamic>.from(item as Map)),
+        )
+        .toList(growable: false);
+  }
+
+  Future<PlacementApplication> applyToDrive(int driveId) async {
+    final response = await _postJson(
+      'POST',
+      '/placement/student/drives/$driveId/applications',
+    );
+    if (response is! Map)
+      throw const ApiException('Invalid application response', 200);
+    return PlacementApplication.fromJson(Map<String, dynamic>.from(response));
+  }
+
+  Future<List<PlacementApplication>> fetchMyApplications() async {
+    final response = await _requestJson(
+      'GET',
+      '/placement/student/applications',
+    );
+    if (response is! List)
+      throw const ApiException('Invalid applications response', 200);
+    return response
+        .map(
+          (item) => PlacementApplication.fromJson(
+            Map<String, dynamic>.from(item as Map),
+          ),
+        )
+        .toList(growable: false);
   }
 
   Future<Map<String, dynamic>> _post(String path, Map<String, dynamic> body) {
     return _request('POST', path, body: body);
   }
 
-  Future<Map<String, dynamic>> _request(String method, String path,
-      {Map<String, dynamic>? body}) async {
+  Future<dynamic> _postJson(String method, String path) {
+    return _requestJson(method, path);
+  }
+
+  Future<Map<String, dynamic>> _request(
+    String method,
+    String path, {
+    Map<String, dynamic>? body,
+  }) async {
+    final decoded = await _requestJson(method, path, body: body);
+    if (decoded is! Map) throw const ApiException('Invalid response', 200);
+    return Map<String, dynamic>.from(decoded);
+  }
+
+  Future<dynamic> _requestJson(
+    String method,
+    String path, {
+    Map<String, dynamic>? body,
+  }) async {
     final headers = <String, String>{'Content-Type': 'application/json'};
     if (_token != null) headers['Authorization'] = 'Bearer $_token';
     final request = http.Request(method, Uri.parse('$baseUrl$path'))
@@ -125,6 +195,6 @@ class PlacementApi {
         response.statusCode,
       );
     }
-    return decoded is Map ? Map<String, dynamic>.from(decoded) : {};
+    return decoded;
   }
 }
