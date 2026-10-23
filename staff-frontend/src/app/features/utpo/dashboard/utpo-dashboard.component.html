@@ -1,0 +1,75 @@
+<div class="dashboard-layout">
+  <nav class="topbar">
+    <div class="brand"><h1>CampusHire</h1><span class="role-badge utpo">UTPO</span></div>
+    <div class="user-area">
+      @if (user()) { <span class="user-name">{{ user()!.fullName }}</span> }
+      <button class="logout-btn" (click)="logout()">Sign Out</button>
+    </div>
+  </nav>
+
+  <main class="dashboard-content">
+    @if (loading()) {
+      <div class="loading">Loading university dashboard…</div>
+    } @else if (user()) {
+      <section class="welcome-section">
+        <h2>Welcome, {{ user()!.fullName }}</h2>
+        <p class="subtitle">University Training &amp; Placement Officer</p>
+      </section>
+
+      @if (errorMessage()) { <div class="alert error">{{ errorMessage() }}</div> }
+      @if (successMessage()) { <div class="alert success">{{ successMessage() }}</div> }
+
+      <section class="actions">
+        <button class="primary-btn" (click)="showCompanyForm.set(!showCompanyForm())">{{ showCompanyForm() ? 'Close company form' : 'Add company' }}</button>
+        <button class="secondary-btn" (click)="showDriveForm.set(!showDriveForm())" [disabled]="companies().length === 0">{{ showDriveForm() ? 'Close drive form' : 'Create university-wide drive' }}</button>
+      </section>
+
+      @if (showCompanyForm()) {
+        <form class="card form-card" (ngSubmit)="submitCompany()">
+          <h3>New company</h3>
+          <div class="form-grid">
+            <label>Company name<input [(ngModel)]="companyForm.name" name="companyName" required /></label>
+            <label>Website<input [(ngModel)]="companyForm.website" name="companyWebsite" type="url" /></label>
+            <label>HR contact name<input [(ngModel)]="companyForm.hrContactName" name="hrName" /></label>
+            <label>HR contact email<input [(ngModel)]="companyForm.hrContactEmail" name="hrEmail" type="email" /></label>
+            <label>HR contact phone<input [(ngModel)]="companyForm.hrContactPhone" name="hrPhone" /></label>
+            <label class="wide">Description<textarea [(ngModel)]="companyForm.description" name="companyDescription" rows="3"></textarea></label>
+          </div>
+          <button class="primary-btn" type="submit" [disabled]="saving()">{{ saving() ? 'Saving…' : 'Save company' }}</button>
+        </form>
+      }
+
+      @if (showDriveForm()) {
+        <form class="card form-card" (ngSubmit)="submitDrive()">
+          <h3>New university-wide placement drive</h3>
+          <p class="form-note">This drive will be visible to eligible students across departments when published.</p>
+          <div class="form-grid">
+            <label>Company<select [(ngModel)]="driveForm.companyId" name="driveCompany" required><option [ngValue]="0">Choose a company</option><option *ngFor="let company of companies()" [ngValue]="company.id">{{ company.name }}</option></select></label>
+            <label>Title<input [(ngModel)]="driveForm.title" name="driveTitle" required /></label>
+            <label>Job type<select [(ngModel)]="driveForm.jobType" name="jobType"><option value="ONSITE">On-site</option><option value="HYBRID">Hybrid</option><option value="REMOTE">Remote</option></select></label>
+            <label>Location<input [(ngModel)]="driveForm.location" name="location" required /></label>
+            <label>Package / salary<input [(ngModel)]="driveForm.packageSalary" name="salary" required /></label>
+            <label>Application deadline<input [(ngModel)]="driveForm.applicationDeadline" name="deadline" type="date" required /></label>
+            <label>Minimum CGPA<input [(ngModel)]="driveForm.minimumCgpa" name="cgpa" type="number" min="0" max="10" step="0.01" /></label>
+            <label>Graduation year<input [(ngModel)]="driveForm.graduationYear" name="graduationYear" type="number" /></label>
+            <label class="wide">Job description<textarea [(ngModel)]="driveForm.jobDescription" name="jobDescription" rows="4" required></textarea></label>
+          </div>
+          <button class="primary-btn" type="submit" [disabled]="saving()">{{ saving() ? 'Saving…' : 'Create draft' }}</button>
+        </form>
+      }
+
+      <section class="dashboard-grid">
+        <div class="card">
+          <div class="section-heading"><h3>Companies</h3><span>{{ companies().length }}</span></div>
+          @if (companies().length === 0) { <p class="empty">No companies have been added yet.</p> }
+          @else { <div class="list"><div class="list-row" *ngFor="let company of companies()"><strong>{{ company.name }}</strong><small>{{ company.hrContactName || 'No HR contact provided' }}</small></div></div> }
+        </div>
+        <div class="card">
+          <div class="section-heading"><h3>University-wide drives</h3><span>{{ drives().length }}</span></div>
+          @if (drives().length === 0) { <p class="empty">No placement drives are available yet.</p> }
+          @else { <div class="list"><div class="drive-row" *ngFor="let drive of drives()"><div><strong>{{ drive.title }}</strong><small>{{ drive.company.name }} · {{ drive.departmentId === null ? 'All departments' : 'Department ' + drive.departmentId }}</small></div><div class="drive-actions"><span class="status">{{ drive.status }}</span><button *ngIf="drive.status === 'DRAFT'" class="publish-btn" (click)="publishDrive(drive)" [disabled]="saving()">Publish</button></div></div></div> }
+        </div>
+      </section>
+    }
+  </main>
+</div>

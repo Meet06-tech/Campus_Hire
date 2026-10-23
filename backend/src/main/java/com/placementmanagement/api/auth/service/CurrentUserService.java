@@ -49,7 +49,9 @@ public class CurrentUserService {
                 .filter(UserAccount::isEnabled)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication is invalid"));
         Student student = user.getStudent();
-        DepartmentResponse department = student == null ? null : department(student.getDepartment());
+        DepartmentResponse department = user.getRole() == UserRole.STUDENT
+                ? (student == null ? null : department(student.getDepartment()))
+                : department(user.getDepartment());
 
         return new MeResponse(
                 user.getId(),
