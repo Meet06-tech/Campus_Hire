@@ -8,12 +8,28 @@ import org.springframework.web.server.ResponseStatusException;
 import com.placementmanagement.api.placement.entity.ApplicationStatus;
 import com.placementmanagement.api.placement.dto.PlacementDtos.*;
 import com.placementmanagement.api.placement.service.PlacementService;
+import com.placementmanagement.api.placement.service.CoordinatorService;
 
 @RestController
 @RequestMapping("/api/placement")
 public class PlacementController {
     private final PlacementService service;
-    public PlacementController(PlacementService service) { this.service = service; }
+    private final CoordinatorService coordinators;
+    public PlacementController(PlacementService service, CoordinatorService coordinators) {
+        this.service = service;
+        this.coordinators = coordinators;
+    }
+
+    @PostMapping("/coordinators") @ResponseStatus(HttpStatus.CREATED)
+    public CoordinatorResponse createCoordinator(@RequestBody CoordinatorRequest request, Authentication auth) {
+        return coordinators.create(auth, request);
+    }
+    @GetMapping("/coordinators")
+    public List<CoordinatorResponse> listCoordinators(Authentication auth) { return coordinators.list(auth); }
+    @GetMapping("/departments")
+    public List<com.placementmanagement.api.auth.dto.AuthDtos.DepartmentInfo> departments(Authentication auth) {
+        return coordinators.departments(auth);
+    }
 
     @PostMapping("/companies") @ResponseStatus(HttpStatus.CREATED)
     public CompanyResponse createCompany(@RequestBody CompanyRequest request, Authentication auth) { return service.createCompany(auth, request); }

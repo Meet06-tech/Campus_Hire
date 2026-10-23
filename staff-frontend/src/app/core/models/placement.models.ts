@@ -107,3 +107,24 @@ export interface DashboardSummary {
   students: number;
   studentsWithApplications: number;
 }
+
+export interface DepartmentInfo {
+  id: number;
+  code: string;
+  name: string;
+}
+
+export interface CoordinatorRequest {
+  fullName: string;
+  universityEmail: string;
+  departmentId: number | null;
+  initialPassword: string;
+}
+
+export interface Coordinator {
+  id: number;
+  fullName: string;
+  universityEmail: string;
+  department: DepartmentInfo;
+  active: boolean;
+}

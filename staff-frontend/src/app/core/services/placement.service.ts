@@ -4,7 +4,7 @@ import { Observable } from 'rxjs';
 import { HttpParams } from '@angular/common/http';
 
 import { environment } from '../../../environments/environment';
-import { Company, CompanyRequest, DashboardSummary, DriveRequest, PlacementDrive, StaffApplicationPage, StaffStudentPage } from '../models/placement.models';
+import { Company, CompanyRequest, Coordinator, CoordinatorRequest, DashboardSummary, DepartmentInfo, DriveRequest, PlacementDrive, StaffApplicationPage, StaffStudentPage } from '../models/placement.models';
 
 @Injectable({ providedIn: 'root' })
 export class PlacementService {
@@ -47,5 +47,17 @@ export class PlacementService {
 
   dashboardSummary(): Observable<DashboardSummary> {
     return this.http.get<DashboardSummary>(`${this.apiUrl}/api/placement/dashboard/summary`);
+  }
+
+  listDepartments(): Observable<DepartmentInfo[]> {
+    return this.http.get<DepartmentInfo[]>(`${this.apiUrl}/api/placement/departments`);
+  }
+
+  listCoordinators(): Observable<Coordinator[]> {
+    return this.http.get<Coordinator[]>(`${this.apiUrl}/api/placement/coordinators`);
+  }
+
+  createCoordinator(request: CoordinatorRequest): Observable<Coordinator> {
+    return this.http.post<Coordinator>(`${this.apiUrl}/api/placement/coordinators`, request);
   }
 }

@@ -3,6 +3,7 @@ package com.placementmanagement.api.placement.dto;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import com.placementmanagement.api.auth.dto.AuthDtos.DepartmentInfo;
 import com.placementmanagement.api.placement.entity.*;
 
 public final class PlacementDtos {
@@ -29,6 +30,9 @@ public final class PlacementDtos {
             long totalElements, int totalPages) {}
     public record DashboardSummaryResponse(long companies, long drives, long publishedDrives,
             long applications, long selectedApplications, long students, long studentsWithApplications) {}
+    public record CoordinatorRequest(String fullName, String universityEmail, Long departmentId, String initialPassword) {}
+    public record CoordinatorResponse(Long id, String fullName, String universityEmail,
+            DepartmentInfo department, boolean active) {}
 
     public interface StaffApplicationProjection {
         Long getApplicationId();

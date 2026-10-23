@@ -1,14 +1,14 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { forkJoin } from 'rxjs';
+import { forkJoin, of } from 'rxjs';
 
 import { AuthService } from '../../../core/services/auth.service';
 import { PlacementService } from '../../../core/services/placement.service';
 import { MeResponse, StaffRole } from '../../../core/models/auth.models';
-import { Company, CompanyRequest, DashboardSummary, DriveRequest, PlacementDrive, StaffApplication, StaffStudent } from '../../../core/models/placement.models';
+import { Company, CompanyRequest, Coordinator, CoordinatorRequest, DashboardSummary, DepartmentInfo, DriveRequest, PlacementDrive, StaffApplication, StaffStudent } from '../../../core/models/placement.models';
 
-type DashboardSection = 'overview' | 'drives' | 'companies' | 'applications' | 'students' | 'reports';
+type DashboardSection = 'overview' | 'drives' | 'companies' | 'applications' | 'students' | 'reports' | 'coordinators';
 
 interface DashboardNavItem {
   id: DashboardSection;
@@ -33,7 +33,7 @@ interface DashboardMetric {
 export class StaffDashboardComponent implements OnInit {
   @Input({ required: true }) role!: StaffRole;
 
-  readonly navItems: DashboardNavItem[] = [
+  private readonly baseNavItems: DashboardNavItem[] = [
     { id: 'overview', label: 'Overview', icon: '⌂' },
     { id: 'drives', label: 'Placement drives', icon: '▣' },
     { id: 'companies', label: 'Companies', icon: '◈' },
@@ -47,6 +47,8 @@ export class StaffDashboardComponent implements OnInit {
   drives = signal<PlacementDrive[]>([]);
   applications = signal<StaffApplication[]>([]);
   students = signal<StaffStudent[]>([]);
+  coordinators = signal<Coordinator[]>([]);
+  departments = signal<DepartmentInfo[]>([]);
   summary = signal<DashboardSummary | null>(null);
   activeSection = signal<DashboardSection>('overview');
   loading = signal(true);
@@ -55,11 +57,19 @@ export class StaffDashboardComponent implements OnInit {
   successMessage = signal<string | null>(null);
   showCompanyForm = signal(false);
   showDriveForm = signal(false);
+  showCoordinatorForm = signal(false);
   searchTerm = signal('');
   statusFilter = signal('ALL');
 
   companyForm: CompanyRequest = this.emptyCompany();
   driveForm: DriveRequest = this.emptyDrive();
+  coordinatorForm: CoordinatorRequest = this.emptyCoordinator();
+
+  get navItems(): DashboardNavItem[] {
+    return this.role === 'UTPO'
+      ? [...this.baseNavItems, { id: 'coordinators', label: 'Department coordinators', icon: '♙' }]
+      : this.baseNavItems;
+  }
 
   constructor(private authService: AuthService, private placementService: PlacementService) {}
 
@@ -70,15 +80,19 @@ export class StaffDashboardComponent implements OnInit {
       drives: this.placementService.listDrives(),
       applications: this.placementService.listApplications(0, 100),
       students: this.placementService.listStudents(0, 100),
-      summary: this.placementService.dashboardSummary()
+      summary: this.placementService.dashboardSummary(),
+      departments: this.role === 'UTPO' ? this.placementService.listDepartments() : of([] as DepartmentInfo[]),
+      coordinators: this.role === 'UTPO' ? this.placementService.listCoordinators() : of([] as Coordinator[])
     }).subscribe({
-      next: ({ user, companies, drives, applications, students, summary }) => {
+      next: ({ user, companies, drives, applications, students, summary, departments, coordinators }) => {
         this.user.set(user);
         this.companies.set(companies);
         this.drives.set(drives);
         this.applications.set(applications.items);
         this.students.set(students.items);
         this.summary.set(summary);
+        this.departments.set(departments);
+        this.coordinators.set(coordinators);
         this.loading.set(false);
       },
       error: (error: { status?: number }) => {
@@ -168,11 +182,29 @@ export class StaffDashboardComponent implements OnInit {
     });
   }
 
+  submitCoordinator(): void {
+    if (!this.coordinatorForm.fullName.trim() || !this.coordinatorForm.universityEmail.trim() || !this.coordinatorForm.departmentId || !this.coordinatorForm.initialPassword) {
+      this.errorMessage.set('Complete the coordinator name, email, department, and initial password.');
+      return;
+    }
+    this.startSave();
+    this.placementService.createCoordinator(this.coordinatorForm).subscribe({
+      next: coordinator => {
+        this.coordinators.update(items => [...items, coordinator].sort((a, b) => a.fullName.localeCompare(b.fullName)));
+        this.coordinatorForm = this.emptyCoordinator();
+        this.showCoordinatorForm.set(false);
+        this.finishSave('Department coordinator created successfully.');
+      },
+      error: () => this.failSave('Coordinator could not be created. Check the email, department, and password.')
+    });
+  }
+
   private startSave(): void { this.saving.set(true); this.errorMessage.set(null); this.successMessage.set(null); }
   private finishSave(message: string): void { this.saving.set(false); this.successMessage.set(message); }
   private failSave(message: string): void { this.saving.set(false); this.errorMessage.set(message); }
   private toInstant(date: string): string { return new Date(`${date}T23:59:59`).toISOString(); }
   private emptyCompany(): CompanyRequest { return { name: '', description: '', website: '', hrContactName: '', hrContactEmail: '', hrContactPhone: '' }; }
   private emptyDrive(): DriveRequest { return { companyId: 0, departmentId: null, title: '', jobDescription: '', jobType: 'ONSITE', location: '', packageSalary: '', applicationDeadline: '', minimumCgpa: null, graduationYear: null, maximumActiveBacklogs: null, eligibleProgramIds: [] }; }
+  private emptyCoordinator(): CoordinatorRequest { return { fullName: '', universityEmail: '', departmentId: null, initialPassword: '' }; }
   logout(): void { this.authService.logout(); }
 }
