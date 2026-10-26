@@ -6,9 +6,9 @@ import { forkJoin, of } from 'rxjs';
 import { AuthService } from '../../../core/services/auth.service';
 import { PlacementService } from '../../../core/services/placement.service';
 import { MeResponse, StaffRole } from '../../../core/models/auth.models';
-import { Company, CompanyRequest, Coordinator, CoordinatorRequest, DashboardSummary, DepartmentInfo, DriveRequest, PlacementDrive, StaffApplication, StaffStudent } from '../../../core/models/placement.models';
+import { Company, CompanyRequest, Coordinator, CoordinatorRequest, DashboardSummary, DepartmentInfo, DriveRequest, PlacementDrive, RecruitmentRound, RoundCandidate, RoundRequest, StaffApplication, StaffStudent } from '../../../core/models/placement.models';
 
-type DashboardSection = 'overview' | 'drives' | 'companies' | 'applications' | 'students' | 'reports' | 'coordinators';
+type DashboardSection = 'overview' | 'drives' | 'companies' | 'applications' | 'students' | 'reports' | 'coordinators' | 'rounds';
 
 interface DashboardNavItem {
   id: DashboardSection;
@@ -49,6 +49,10 @@ export class StaffDashboardComponent implements OnInit {
   students = signal<StaffStudent[]>([]);
   coordinators = signal<Coordinator[]>([]);
   departments = signal<DepartmentInfo[]>([]);
+  rounds = signal<RecruitmentRound[]>([]);
+  candidates = signal<RoundCandidate[]>([]);
+  selectedDrive = signal<PlacementDrive | null>(null);
+  selectedRound = signal<RecruitmentRound | null>(null);
   summary = signal<DashboardSummary | null>(null);
   activeSection = signal<DashboardSection>('overview');
   loading = signal(true);
@@ -64,11 +68,12 @@ export class StaffDashboardComponent implements OnInit {
   companyForm: CompanyRequest = this.emptyCompany();
   driveForm: DriveRequest = this.emptyDrive();
   coordinatorForm: CoordinatorRequest = this.emptyCoordinator();
+  roundForm: RoundRequest = { name: '', order: 1, finalRound: false };
 
   get navItems(): DashboardNavItem[] {
     return this.role === 'UTPO'
       ? [...this.baseNavItems, { id: 'coordinators', label: 'Department coordinators', icon: '♙' }]
-      : this.baseNavItems;
+      : [...this.baseNavItems, { id: 'rounds', label: 'Round management', icon: '◉' }];
   }
 
   constructor(private authService: AuthService, private placementService: PlacementService) {}
@@ -179,6 +184,56 @@ export class StaffDashboardComponent implements OnInit {
         this.finishSave('Placement drive published successfully.');
       },
       error: () => this.failSave('This drive could not be published. It may no longer be a draft or may fail backend validation.')
+    });
+  }
+
+  openRounds(drive: PlacementDrive): void {
+    this.selectedDrive.set(drive);
+    this.rounds.set([]);
+    this.candidates.set([]);
+    this.selectedRound.set(null);
+    this.nav('rounds');
+    this.placementService.listRounds(drive.id).subscribe({ next: rounds => { this.rounds.set(rounds); if (rounds[0]) this.selectRound(rounds[0]); }, error: () => this.errorMessage.set('Could not load drive rounds.') });
+  }
+  selectRound(round: RecruitmentRound): void {
+    const drive = this.selectedDrive();
+    if (!drive) return;
+    this.selectedRound.set(round);
+    this.placementService.listRoundCandidates(drive.id, round.id).subscribe({ next: candidates => this.candidates.set(candidates), error: () => this.errorMessage.set('Could not load round candidates.') });
+  }
+  submitRound(): void {
+    const drive = this.selectedDrive();
+    if (!drive || !this.roundForm.name.trim() || this.roundForm.order < 1) { this.errorMessage.set('Enter a round name and positive order.'); return; }
+    this.startSave();
+    this.placementService.createRound(drive.id, { ...this.roundForm, name: this.roundForm.name.trim() }).subscribe({
+      next: round => { this.rounds.update(items => [...items, round].sort((a, b) => a.order - b.order)); this.roundForm = { name: '', order: this.rounds().length + 1, finalRound: false }; this.finishSave('Round added successfully.'); },
+      error: () => this.failSave('Round could not be added. Structural edits are blocked after results exist.')
+    });
+  }
+  removeRound(round: RecruitmentRound): void {
+    const drive = this.selectedDrive();
+    if (!drive || !confirm(`Remove ${round.name}?`)) return;
+    this.startSave();
+    this.placementService.deleteRound(drive.id, round.id).subscribe({ next: () => { this.rounds.update(items => items.filter(item => item.id !== round.id)); this.finishSave('Round removed.'); }, error: () => this.failSave('This round cannot be removed after results have been recorded.') });
+  }
+  saveResult(candidate: RoundCandidate, result: 'PASSED' | 'FAILED'): void {
+    const drive = this.selectedDrive(); const round = this.selectedRound();
+    if (!drive || !round) return;
+    this.placementService.saveRoundResult(drive.id, round.id, candidate.applicationId, result).subscribe({ next: () => { this.candidates.update(items => items.map(item => item.applicationId === candidate.applicationId ? { ...item, result } : item)); this.successMessage.set('Result saved.'); }, error: () => this.errorMessage.set('Result could not be saved.') });
+  }
+  publishRoundResults(): void {
+    const drive = this.selectedDrive(); const round = this.selectedRound();
+    if (!drive || !round) return;
+    this.startSave();
+    this.placementService.publishRound(drive.id, round.id).subscribe({ next: updated => { this.rounds.update(items => items.map(item => item.id === updated.id ? updated : item)); this.selectedRound.set(updated); this.finishSave('Round results published.'); }, error: () => this.failSave('Round results could not be published.') });
+  }
+  setFinalOutcome(candidate: RoundCandidate, outcome: 'SELECTED' | 'REJECTED'): void {
+    const drive = this.selectedDrive();
+    if (!drive) return;
+    this.startSave();
+    this.placementService.setFinalOutcome(drive.id, candidate.applicationId, outcome).subscribe({
+      next: () => this.finishSave(`Application marked ${outcome === 'SELECTED' ? 'selected' : 'not selected'}.`),
+      error: () => this.failSave('The final outcome could not be saved. Confirm the final round is published and the student passed it.')
     });
   }
 

@@ -9,15 +9,18 @@ import com.placementmanagement.api.placement.entity.ApplicationStatus;
 import com.placementmanagement.api.placement.dto.PlacementDtos.*;
 import com.placementmanagement.api.placement.service.PlacementService;
 import com.placementmanagement.api.placement.service.CoordinatorService;
+import com.placementmanagement.api.placement.service.RecruitmentService;
 
 @RestController
 @RequestMapping("/api/placement")
 public class PlacementController {
     private final PlacementService service;
     private final CoordinatorService coordinators;
-    public PlacementController(PlacementService service, CoordinatorService coordinators) {
+    private final RecruitmentService recruitment;
+    public PlacementController(PlacementService service, CoordinatorService coordinators, RecruitmentService recruitment) {
         this.service = service;
         this.coordinators = coordinators;
+        this.recruitment = recruitment;
     }
 
     @PostMapping("/coordinators") @ResponseStatus(HttpStatus.CREATED)
@@ -29,6 +32,46 @@ public class PlacementController {
     @GetMapping("/departments")
     public List<com.placementmanagement.api.auth.dto.AuthDtos.DepartmentInfo> departments(Authentication auth) {
         return coordinators.departments(auth);
+    }
+
+    @GetMapping("/drives/{driveId}/rounds")
+    public List<RoundResponse> rounds(@PathVariable Long driveId, Authentication auth) {
+        return recruitment.listRounds(auth, driveId);
+    }
+    @PostMapping("/drives/{driveId}/rounds") @ResponseStatus(HttpStatus.CREATED)
+    public RoundResponse createRound(@PathVariable Long driveId, @RequestBody RoundRequest request, Authentication auth) {
+        return recruitment.createRound(auth, driveId, request);
+    }
+    @PutMapping("/drives/{driveId}/rounds/{roundId}")
+    public RoundResponse updateRound(@PathVariable Long driveId, @PathVariable Long roundId,
+            @RequestBody RoundRequest request, Authentication auth) {
+        return recruitment.updateRound(auth, driveId, roundId, request);
+    }
+    @DeleteMapping("/drives/{driveId}/rounds/{roundId}") @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteRound(@PathVariable Long driveId, @PathVariable Long roundId, Authentication auth) {
+        recruitment.deleteRound(auth, driveId, roundId);
+    }
+    @GetMapping("/drives/{driveId}/rounds/{roundId}/candidates")
+    public List<CandidateResponse> candidates(@PathVariable Long driveId, @PathVariable Long roundId, Authentication auth) {
+        return recruitment.listCandidates(auth, driveId, roundId);
+    }
+    @PutMapping("/drives/{driveId}/rounds/{roundId}/results/{applicationId}")
+    public RoundResultResponse result(@PathVariable Long driveId, @PathVariable Long roundId,
+            @PathVariable Long applicationId, @RequestBody RoundResultRequest request, Authentication auth) {
+        return recruitment.recordResult(auth, driveId, roundId, applicationId, request);
+    }
+    @PostMapping("/drives/{driveId}/rounds/{roundId}/publish")
+    public RoundResponse publishRound(@PathVariable Long driveId, @PathVariable Long roundId, Authentication auth) {
+        return recruitment.publishRound(auth, driveId, roundId);
+    }
+    @PutMapping("/drives/{driveId}/applications/{applicationId}/outcome")
+    public void finalOutcome(@PathVariable Long driveId, @PathVariable Long applicationId,
+            @RequestBody FinalOutcomeRequest request, Authentication auth) {
+        recruitment.setFinalOutcome(auth, driveId, applicationId, request);
+    }
+    @GetMapping("/student/applications/progress")
+    public List<StudentApplicationProgress> studentProgress(Authentication auth) {
+        return recruitment.studentProgress(auth);
     }
 
     @PostMapping("/companies") @ResponseStatus(HttpStatus.CREATED)

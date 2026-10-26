@@ -20,4 +20,5 @@ public class PlacementApplication {
     public Student getStudent() { return student; }
     public Instant getAppliedAt() { return appliedAt; }
     public ApplicationStatus getStatus() { return status; }
+    public void setStatus(ApplicationStatus status) { this.status = status; }
 }

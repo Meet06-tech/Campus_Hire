@@ -156,6 +156,23 @@ class PlacementApi {
         .toList(growable: false);
   }
 
+  Future<List<StudentApplicationProgress>> fetchMyApplicationProgress() async {
+    final response = await _requestJson(
+      'GET',
+      '/placement/student/applications/progress',
+    );
+    if (response is! List) {
+      throw const ApiException('Invalid application progress response', 200);
+    }
+    return response
+        .map(
+          (item) => StudentApplicationProgress.fromJson(
+            Map<String, dynamic>.from(item as Map),
+          ),
+        )
+        .toList(growable: false);
+  }
+
   Future<Map<String, dynamic>> _post(String path, Map<String, dynamic> body) {
     return _request('POST', path, body: body);
   }

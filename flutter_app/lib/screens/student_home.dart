@@ -442,7 +442,7 @@ class ApplicationsTab extends StatefulWidget {
 }
 
 class _ApplicationsTabState extends State<ApplicationsTab> {
-  List<PlacementApplication> _applications = const [];
+  List<StudentApplicationProgress> _applications = const [];
   String? _error;
   bool _loading = true;
 
@@ -458,7 +458,7 @@ class _ApplicationsTabState extends State<ApplicationsTab> {
       _error = null;
     });
     try {
-      final applications = await widget.api.fetchMyApplications();
+      final applications = await widget.api.fetchMyApplicationProgress();
       if (mounted) setState(() => _applications = applications);
     } on ApiException catch (error) {
       if (error.statusCode == 401) {
@@ -814,67 +814,166 @@ class _EligibilityRow extends StatelessWidget {
 class _ApplicationCard extends StatelessWidget {
   const _ApplicationCard({required this.application});
 
-  final PlacementApplication application;
+  final StudentApplicationProgress application;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final statusColor = _statusColor(colors, application.status);
+    final status = application.finalOutcome ?? application.applicationStatus;
+    final statusColor = _statusColor(colors, status);
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Row(
+        child: Column(
           children: [
-            Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                color: colors.primaryContainer,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(Icons.work_history_rounded, color: colors.primary),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Placement drive #${application.driveId}',
-                    style: const TextStyle(fontWeight: FontWeight.w800),
+            Row(
+              children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: colors.primaryContainer,
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                  const SizedBox(height: 5),
-                  Text(
-                    'Applied ${_formatDate(application.appliedAt)}',
+                  child: Icon(
+                    Icons.work_history_rounded,
+                    color: colors.primary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        application.driveTitle,
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        '${application.companyName} · Applied ${_formatDate(application.appliedAt)}',
+                        style: TextStyle(
+                          color: colors.onSurfaceVariant,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 7,
+                  ),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    _applicationStatusLabel(status),
                     style: TextStyle(
-                      color: colors.onSurfaceVariant,
-                      fontSize: 13,
+                      color: statusColor,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-              decoration: BoxDecoration(
-                color: statusColor.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                application.status,
-                style: TextStyle(
-                  color: statusColor,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 12,
+            if (application.rounds.isNotEmpty) ...[
+              const Divider(height: 28),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Recruitment progress',
+                  style: TextStyle(fontWeight: FontWeight.w800),
                 ),
               ),
-            ),
+              const SizedBox(height: 12),
+              ...application.rounds.map(
+                (round) => _RoundProgressRow(round: round),
+              ),
+            ] else ...[
+              const SizedBox(height: 14),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Recruitment rounds have not been configured yet.',
+                  style: TextStyle(fontSize: 13),
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
+  }
+}
+
+class _RoundProgressRow extends StatelessWidget {
+  const _RoundProgressRow({required this.round});
+
+  final StudentRoundProgress round;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final visible = round.resultsPublished;
+    final label = visible ? _roundStatusLabel(round.status) : 'Results pending';
+    final color = visible && round.status == 'CLEARED'
+        ? Colors.green.shade700
+        : visible && round.status == 'NOT_CLEARED'
+        ? colors.error
+        : colors.onSurfaceVariant;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 14,
+            backgroundColor: colors.primaryContainer,
+            child: Text(
+              '${round.order}',
+              style: TextStyle(color: colors.primary),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(child: Text(round.name)),
+          Text(
+            label,
+            style: TextStyle(color: color, fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _applicationStatusLabel(String status) {
+  switch (status) {
+    case 'SELECTED':
+      return 'Selected';
+    case 'REJECTED':
+      return 'Not selected';
+    case 'WITHDRAWN':
+      return 'Withdrawn';
+    default:
+      return 'In progress';
+  }
+}
+
+String _roundStatusLabel(String status) {
+  switch (status) {
+    case 'CLEARED':
+      return 'Cleared';
+    case 'NOT_CLEARED':
+      return 'Not cleared';
+    case 'AWAITING_RESULT':
+      return 'Awaiting result';
+    default:
+      return 'Upcoming';
   }
 }
 

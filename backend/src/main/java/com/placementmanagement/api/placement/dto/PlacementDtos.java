@@ -33,6 +33,20 @@ public final class PlacementDtos {
     public record CoordinatorRequest(String fullName, String universityEmail, Long departmentId, String initialPassword) {}
     public record CoordinatorResponse(Long id, String fullName, String universityEmail,
             DepartmentInfo department, boolean active) {}
+    public record RoundRequest(String name, Integer order, Boolean finalRound) {}
+    public record RoundResponse(Long id, Long driveId, Integer order, String name, boolean finalRound,
+            boolean resultsPublished, long totalCandidates, long passed, long failed, long pending) {}
+    public record CandidateResponse(Long applicationId, Long studentId, String studentName,
+            String enrollmentNumber, String academicProgram, RoundResultStatus result) {}
+    public record RoundResultRequest(RoundResultStatus result) {}
+    public record FinalOutcomeRequest(ApplicationStatus outcome) {}
+    public record RoundResultResponse(Long roundId, Long applicationId, RoundResultStatus result,
+            Instant recordedAt) {}
+    public record StudentRoundProgress(Long roundId, Integer order, String name,
+            boolean resultsPublished, String status) {}
+    public record StudentApplicationProgress(Long applicationId, Long driveId, String companyName,
+            String driveTitle, Instant appliedAt, ApplicationStatus applicationStatus,
+            String finalOutcome, List<StudentRoundProgress> rounds) {}
 
     public interface StaffApplicationProjection {
         Long getApplicationId();

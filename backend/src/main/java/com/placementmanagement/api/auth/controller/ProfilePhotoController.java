@@ -20,7 +20,7 @@ import com.placementmanagement.api.auth.service.ProfilePhotoService.PhotoFile;
 
 @RestController
 @RequestMapping("/api/me/profile-photo")
-public class ProfilePhotoController {
+public class  ProfilePhotoController {
     private final ProfilePhotoService profilePhotoService;
 
     public ProfilePhotoController(ProfilePhotoService profilePhotoService) {

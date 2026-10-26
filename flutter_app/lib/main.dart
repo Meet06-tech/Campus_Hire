@@ -16,6 +16,7 @@ class PlacementManagementApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       navigatorKey: appNavigatorKey,
       title: 'CampusHire',
       theme: ThemeData(

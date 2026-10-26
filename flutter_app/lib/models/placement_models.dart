@@ -115,6 +115,76 @@ class PlacementApplication {
   }
 }
 
+class StudentRoundProgress {
+  const StudentRoundProgress({
+    required this.id,
+    required this.order,
+    required this.name,
+    required this.resultsPublished,
+    required this.status,
+  });
+
+  final int id;
+  final int order;
+  final String name;
+  final bool resultsPublished;
+  final String status;
+
+  factory StudentRoundProgress.fromJson(Map<String, dynamic> json) {
+    return StudentRoundProgress(
+      id: (json['roundId'] as num).toInt(),
+      order: (json['order'] as num).toInt(),
+      name: (json['name'] ?? '').toString(),
+      resultsPublished: json['resultsPublished'] == true,
+      status: (json['status'] ?? 'UPCOMING').toString(),
+    );
+  }
+}
+
+class StudentApplicationProgress {
+  const StudentApplicationProgress({
+    required this.id,
+    required this.driveId,
+    required this.companyName,
+    required this.driveTitle,
+    required this.appliedAt,
+    required this.applicationStatus,
+    required this.finalOutcome,
+    required this.rounds,
+  });
+
+  final int id;
+  final int driveId;
+  final String companyName;
+  final String driveTitle;
+  final DateTime appliedAt;
+  final String applicationStatus;
+  final String? finalOutcome;
+  final List<StudentRoundProgress> rounds;
+
+  factory StudentApplicationProgress.fromJson(Map<String, dynamic> json) {
+    final rawRounds = json['rounds'];
+    return StudentApplicationProgress(
+      id: (json['applicationId'] as num).toInt(),
+      driveId: (json['driveId'] as num).toInt(),
+      companyName: (json['companyName'] ?? '').toString(),
+      driveTitle: (json['driveTitle'] ?? '').toString(),
+      appliedAt: DateTime.parse((json['appliedAt'] ?? '').toString()),
+      applicationStatus: (json['applicationStatus'] ?? '').toString(),
+      finalOutcome: json['finalOutcome']?.toString(),
+      rounds: rawRounds is List
+          ? rawRounds
+                .map(
+                  (item) => StudentRoundProgress.fromJson(
+                    Map<String, dynamic>.from(item as Map),
+                  ),
+                )
+                .toList(growable: false)
+          : const [],
+    );
+  }
+}
+
 DateTime? _parseDate(Object? value) {
   if (value == null) return null;
   return DateTime.tryParse(value.toString());

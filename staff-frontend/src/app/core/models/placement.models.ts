@@ -128,3 +128,43 @@ export interface Coordinator {
   department: DepartmentInfo;
   active: boolean;
 }
+
+export type RoundResultStatus = 'PENDING' | 'PASSED' | 'FAILED';
+export interface RecruitmentRound {
+  id: number;
+  driveId: number;
+  order: number;
+  name: string;
+  finalRound: boolean;
+  resultsPublished: boolean;
+  totalCandidates: number;
+  passed: number;
+  failed: number;
+  pending: number;
+}
+export interface RoundRequest { name: string; order: number; finalRound: boolean; }
+export interface RoundCandidate {
+  applicationId: number;
+  studentId: number;
+  studentName: string;
+  enrollmentNumber: string;
+  academicProgram: string | null;
+  result: RoundResultStatus;
+}
+export interface StudentRoundProgress {
+  roundId: number;
+  order: number;
+  name: string;
+  resultsPublished: boolean;
+  status: 'CLEARED' | 'NOT_CLEARED' | 'AWAITING_RESULT' | 'UPCOMING';
+}
+export interface StudentApplicationProgress {
+  applicationId: number;
+  driveId: number;
+  companyName: string;
+  driveTitle: string;
+  appliedAt: string;
+  applicationStatus: ApplicationStatus;
+  finalOutcome: 'SELECTED' | 'NOT_SELECTED' | null;
+  rounds: StudentRoundProgress[];
+}

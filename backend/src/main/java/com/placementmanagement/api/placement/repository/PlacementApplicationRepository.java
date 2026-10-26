@@ -11,6 +11,7 @@ import com.placementmanagement.api.placement.dto.PlacementDtos.StaffApplicationP
 public interface PlacementApplicationRepository extends JpaRepository<PlacementApplication, Long> {
     boolean existsByDrive_IdAndStudent_Id(Long driveId, Long studentId);
     List<PlacementApplication> findAllByStudent_IdOrderByAppliedAtDesc(Long studentId);
+    List<PlacementApplication> findAllByDrive_IdOrderByAppliedAtAsc(Long driveId);
     long countByStatus(ApplicationStatus status);
     long countByDrive_Department_Id(Long departmentId);
     long countByDrive_Department_IdAndStatus(Long departmentId, ApplicationStatus status);

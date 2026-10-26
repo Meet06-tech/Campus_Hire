@@ -1,0 +1,99 @@
+%% CampusHire activity workflow, based on the current Spring Boot, Angular and Flutter implementation.
+flowchart LR
+  classDef start fill:#0B1F3A,color:#fff,stroke:#0B1F3A
+  classDef action fill:#EAF2FB,color:#182B49,stroke:#4CA7D8
+  classDef decision fill:#FFF2DF,color:#182B49,stroke:#D7942B
+  classDef error fill:#FCECEC,color:#8B2C2C,stroke:#B64949
+  classDef store fill:#E8F6F0,color:#124D3C,stroke:#1F8A70
+  classDef end fill:#1F8A70,color:#fff,stroke:#1F8A70
+
+  subgraph STUDENT[Student]
+    direction TB
+    s0((Start)):::start
+    s1[Enter enrollment number and password]:::action
+    s2[Browse published drives]:::action
+    s3[Choose a drive]:::action
+    s4[View application and round progress]:::action
+    s5((End)):::end
+  end
+
+  subgraph STAFF[Angular Staff Dashboard / DTPO]
+    direction TB
+    d0[Create company or select company]:::action
+    d1[Create draft drive]:::action
+    d2[Publish department drive]:::action
+    d3[Configure ordered recruitment rounds]:::action
+    d4[Load candidates for current round]:::action
+    d5[Record PASSED or FAILED result]:::action
+    d6[Publish round results]:::action
+    d7[Record SELECTED or REJECTED outcome]:::action
+  end
+
+  subgraph UTPO[UTPO]
+    direction TB
+    u0[Manage university-wide companies and drives]:::action
+    u1[Create or list DTPO coordinators]:::action
+  end
+
+  subgraph API[Spring Boot Backend]
+    direction TB
+    a0[Validate credentials, active account and role]:::action
+    a1{Credentials valid?}:::decision
+    a2[Reject authentication]:::error
+    a3{Role is STUDENT?}:::decision
+    a4[Authorize staff scope from role and department]:::action
+    a5[Filter published drives by department and eligibility]:::action
+    a6{Drive published, open and eligible?}:::decision
+    a7[Reject visibility or application]:::error
+    a8[Check unique student-drive application]:::action
+    a9{Already applied?}:::decision
+    a10[Reject duplicate application]:::error
+    a11[Persist application as APPLIED]:::store
+    a12[Validate company, active academic year, deadline and drive fields]:::action
+    a13{Valid draft transition?}:::decision
+    a14[Reject publish request]:::error
+    a15[Persist drive status PUBLISHED]:::store
+    a16[Authorize DTPO department or UTPO scope]:::action
+    a17{Authorized?}:::decision
+    a18[Reject with forbidden response]:::error
+    a19[Check current round candidates]:::action
+    a20{First round or passed previous round?}:::decision
+    a21[Exclude candidate from later round]:::error
+    a22{Final round result PASSED?}:::decision
+    a23[Await or retain application status]:::action
+    a24[Persist final outcome]:::store
+    a25((End)):::end
+  end
+
+  subgraph DB[PostgreSQL Database]
+    direction TB
+    q0[(users, roles, students)]:::store
+    q1[(companies, academic_years, placement_drives)]:::store
+    q2[(placement_applications)]:::store
+    q3[(placement_drive_rounds, placement_round_results)]:::store
+  end
+
+  s0 --> s1 --> a0 --> q0 --> a1
+  a1 -- No --> a2 --> a25
+  a1 -- Yes --> a3
+  a3 -- Yes --> a5 --> s2 --> s3 --> a6
+  a6 -- No --> a7 --> s5
+  a6 -- Yes --> a8 --> q2 --> a9
+  a9 -- Yes --> a10 --> s5
+  a9 -- No --> a11 --> q2 --> s4 --> s5
+  a3 -- No --> a4 --> a16
+
+  a16 --> a17
+  a17 -- No --> a18 --> a25
+  a17 -- Yes --> d0 --> d1 --> a12 --> q1 --> a13
+  a13 -- No --> a14 --> a25
+  a13 -- Yes --> a15 --> q1 --> d2
+  d2 --> d3 --> a19 --> q2 --> a20
+  a20 -- No --> a21 --> a25
+  a20 -- Yes --> d4 --> d5 --> q3 --> d6 --> a22
+  a22 -- No --> a23 --> s4
+  a22 -- Yes --> d7 --> a24 --> q2 --> s4
+
+  u0 --> a16
+  u1 --> a16
+  a4 --> u0
