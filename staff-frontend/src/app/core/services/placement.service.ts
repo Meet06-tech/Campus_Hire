@@ -4,7 +4,7 @@ import { Observable } from 'rxjs';
 import { HttpParams } from '@angular/common/http';
 
 import { environment } from '../../../environments/environment';
-import { Company, CompanyRequest, Coordinator, CoordinatorRequest, DashboardSummary, DepartmentInfo, DriveRequest, PlacementDrive, RecruitmentRound, RoundCandidate, RoundRequest, StaffApplicationPage, StaffStudentPage } from '../models/placement.models';
+import { ApplicationResponse, ApplicationStatus, Company, CompanyRequest, Coordinator, CoordinatorRequest, DashboardSummary, DepartmentInfo, DriveRequest, PlacementDrive, RecruitmentRound, RoundCandidate, RoundRequest, StaffApplication, StaffApplicationPage, StaffStudentPage } from '../models/placement.models';
 
 @Injectable({ providedIn: 'root' })
 export class PlacementService {
@@ -32,10 +32,17 @@ export class PlacementService {
     return this.http.post<PlacementDrive>(`${this.apiUrl}/api/placement/drives/${driveId}/publish`, {});
   }
 
-  listApplications(page = 0, size = 25, search = '', status = ''): Observable<StaffApplicationPage> {
+  cancelDrive(driveId: number): Observable<PlacementDrive> {
+    return this.http.post<PlacementDrive>(`${this.apiUrl}/api/placement/drives/${driveId}/cancel`, {});
+  }
+
+  listApplications(page = 0, size = 25, search = '', status: ApplicationStatus | '' = '', companyId?: number, minCgpa?: number, maxCgpa?: number): Observable<StaffApplicationPage> {
     let params = new HttpParams().set('page', page).set('size', size);
     if (search.trim()) params = params.set('search', search.trim());
     if (status) params = params.set('status', status);
+    if (companyId !== undefined) params = params.set('companyId', companyId);
+    if (minCgpa !== undefined) params = params.set('minCgpa', minCgpa);
+    if (maxCgpa !== undefined) params = params.set('maxCgpa', maxCgpa);
     return this.http.get<StaffApplicationPage>(`${this.apiUrl}/api/placement/applications`, { params });
   }
 
@@ -82,7 +89,7 @@ export class PlacementService {
   publishRound(driveId: number, roundId: number): Observable<RecruitmentRound> {
     return this.http.post<RecruitmentRound>(`${this.apiUrl}/api/placement/drives/${driveId}/rounds/${roundId}/publish`, {});
   }
-  setFinalOutcome(driveId: number, applicationId: number, outcome: 'SELECTED' | 'REJECTED'): Observable<void> {
-    return this.http.put<void>(`${this.apiUrl}/api/placement/drives/${driveId}/applications/${applicationId}/outcome`, { outcome });
+  setFinalOutcome(driveId: number, applicationId: number, outcome: 'SELECTED' | 'REJECTED'): Observable<ApplicationResponse> {
+    return this.http.put<ApplicationResponse>(`${this.apiUrl}/api/placement/drives/${driveId}/applications/${applicationId}/outcome`, { outcome });
   }
 }

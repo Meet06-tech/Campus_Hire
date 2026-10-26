@@ -66,6 +66,8 @@ export interface StaffApplication {
   companyName: string;
   appliedAt: string;
   status: ApplicationStatus;
+  studentCgpa: number | null;
+  studentGraduationYear: number | null;
 }
 
 export interface StaffApplicationPage {
@@ -143,6 +145,14 @@ export interface RecruitmentRound {
   pending: number;
 }
 export interface RoundRequest { name: string; order: number; finalRound: boolean; }
+export interface ApplicationResponse {
+  id: number;
+  driveId: number;
+  studentId: number;
+  appliedAt: string;
+  status: ApplicationStatus;
+}
+
 export interface RoundCandidate {
   applicationId: number;
   studentId: number;
@@ -150,6 +160,7 @@ export interface RoundCandidate {
   enrollmentNumber: string;
   academicProgram: string | null;
   result: RoundResultStatus;
+  applicationStatus: ApplicationStatus;
 }
 export interface StudentRoundProgress {
   roundId: number;

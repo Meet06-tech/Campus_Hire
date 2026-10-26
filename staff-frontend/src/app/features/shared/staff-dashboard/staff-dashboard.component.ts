@@ -6,7 +6,7 @@ import { forkJoin, of } from 'rxjs';
 import { AuthService } from '../../../core/services/auth.service';
 import { PlacementService } from '../../../core/services/placement.service';
 import { MeResponse, StaffRole } from '../../../core/models/auth.models';
-import { Company, CompanyRequest, Coordinator, CoordinatorRequest, DashboardSummary, DepartmentInfo, DriveRequest, PlacementDrive, RecruitmentRound, RoundCandidate, RoundRequest, StaffApplication, StaffStudent } from '../../../core/models/placement.models';
+import { ApplicationStatus, Company, CompanyRequest, Coordinator, CoordinatorRequest, DashboardSummary, DepartmentInfo, DriveRequest, PlacementDrive, RecruitmentRound, RoundCandidate, RoundRequest, StaffApplication, StaffStudent } from '../../../core/models/placement.models';
 
 type DashboardSection = 'overview' | 'drives' | 'companies' | 'applications' | 'students' | 'reports' | 'coordinators' | 'rounds';
 
@@ -64,6 +64,10 @@ export class StaffDashboardComponent implements OnInit {
   showCoordinatorForm = signal(false);
   searchTerm = signal('');
   statusFilter = signal('ALL');
+  companyFilter = signal<number | 'ALL'>('ALL');
+  minCgpaFilter = signal<number | null>(null);
+  maxCgpaFilter = signal<number | null>(null);
+  selectedApplicationIds = signal<number[]>([]);
 
   companyForm: CompanyRequest = this.emptyCompany();
   driveForm: DriveRequest = this.emptyDrive();
@@ -141,6 +145,76 @@ export class StaffDashboardComponent implements OnInit {
     });
   }
 
+  filteredApplications(): StaffApplication[] {
+    const company = this.companyFilter();
+    const min = this.minCgpaFilter();
+    const max = this.maxCgpaFilter();
+    return this.applications().filter(application => {
+      const matchesCompany = company === 'ALL' || this.companies().some(item => item.id === company && item.name === application.companyName);
+      const cgpa = application.studentCgpa;
+      const matchesMin = min === null || (cgpa !== null && cgpa >= min);
+      const matchesMax = max === null || (cgpa !== null && cgpa <= max);
+      return matchesCompany && matchesMin && matchesMax;
+    });
+  }
+
+  allVisibleApplicationsSelected(): boolean {
+    const visible = this.filteredApplications();
+    return visible.length > 0 && visible.every(application => this.selectedApplicationIds().includes(application.id));
+  }
+
+  toggleApplicationSelection(applicationId: number): void {
+    this.selectedApplicationIds.update(ids => ids.includes(applicationId) ? ids.filter(id => id !== applicationId) : [...ids, applicationId]);
+  }
+
+  toggleAllVisibleApplications(): void {
+    const visibleIds = this.filteredApplications().map(application => application.id);
+    if (this.allVisibleApplicationsSelected()) {
+      this.selectedApplicationIds.update(ids => ids.filter(id => !visibleIds.includes(id)));
+    } else {
+      this.selectedApplicationIds.update(ids => Array.from(new Set([...ids, ...visibleIds])));
+    }
+  }
+
+  clearApplicationSelection(): void { this.selectedApplicationIds.set([]); }
+
+  loadFilteredApplications(): void {
+    const companyFilter = this.companyFilter();
+    const selectedCompany = typeof companyFilter === 'number' ? companyFilter : undefined;
+    const applicationStatuses: ApplicationStatus[] = ['APPLIED', 'SHORTLISTED', 'SELECTED', 'REJECTED', 'WITHDRAWN'];
+    const selectedStatus = this.statusFilter();
+    const status = applicationStatuses.includes(selectedStatus as ApplicationStatus)
+      ? selectedStatus as ApplicationStatus
+      : '';
+    this.placementService.listApplications(0, 100, '', status, selectedCompany, this.minCgpaFilter() ?? undefined, this.maxCgpaFilter() ?? undefined).subscribe({
+      next: page => this.applications.set(page.items),
+      error: error => {
+        if (error.status === 401) this.authService.logout();
+        else this.errorMessage.set('Could not refresh applications for the selected filters.');
+      }
+    });
+  }
+
+  onApplicationStatusFilterChange(value: string): void {
+    this.statusFilter.set(value);
+    this.loadFilteredApplications();
+  }
+
+  onCompanyFilterChange(value: number | 'ALL'): void {
+    this.companyFilter.set(value);
+    this.loadFilteredApplications();
+  }
+
+  onMinCgpaFilterChange(value: string | number): void {
+    this.minCgpaFilter.set(value === '' ? null : Number(value));
+    this.loadFilteredApplications();
+  }
+
+  onMaxCgpaFilterChange(value: string | number): void {
+    this.maxCgpaFilter.set(value === '' ? null : Number(value));
+    this.loadFilteredApplications();
+  }
+
   submitCompany(): void {
     if (!this.companyForm.name.trim()) {
       this.errorMessage.set('Company name is required.');
@@ -184,6 +258,18 @@ export class StaffDashboardComponent implements OnInit {
         this.finishSave('Placement drive published successfully.');
       },
       error: () => this.failSave('This drive could not be published. It may no longer be a draft or may fail backend validation.')
+    });
+  }
+
+  cancelDrive(drive: PlacementDrive): void {
+    if (!confirm(`Cancel ${drive.title}? Students will no longer be able to apply, but existing applications will remain.`)) return;
+    this.startSave();
+    this.placementService.cancelDrive(drive.id).subscribe({
+      next: cancelled => {
+        this.drives.update(items => items.map(item => item.id === cancelled.id ? cancelled : item));
+        this.finishSave('Placement drive cancelled. Existing application history was preserved.');
+      },
+      error: () => this.failSave('This drive could not be cancelled. Only draft or published drives can be cancelled.')
     });
   }
 
@@ -232,8 +318,44 @@ export class StaffDashboardComponent implements OnInit {
     if (!drive) return;
     this.startSave();
     this.placementService.setFinalOutcome(drive.id, candidate.applicationId, outcome).subscribe({
-      next: () => this.finishSave(`Application marked ${outcome === 'SELECTED' ? 'selected' : 'not selected'}.`),
-      error: () => this.failSave('The final outcome could not be saved. Confirm the final round is published and the student passed it.')
+      next: updated => {
+        this.applications.update(items => items.map(item => item.id === updated.id ? { ...item, status: updated.status } : item));
+        this.candidates.update(items => items.map(item => item.applicationId === candidate.applicationId ? { ...item, applicationStatus: updated.status, result: outcome === 'SELECTED' ? 'PASSED' : 'FAILED' } : item));
+        this.finishSave(`Application marked ${outcome === 'SELECTED' ? 'selected' : 'not selected'}.`);
+      },
+      error: error => this.failSave(error.error?.detail ?? error.error?.message
+        ?? 'The final outcome could not be saved. Confirm the drive is not cancelled, the final round is published, and the student passed all previous rounds.')
+    });
+  }
+
+  setApplicationOutcome(application: StaffApplication, outcome: 'SELECTED' | 'REJECTED'): void {
+    if (!confirm(`${outcome === 'SELECTED' ? 'Select' : 'Reject'} ${application.studentName}'s application?`)) return;
+    this.startSave();
+    this.placementService.setFinalOutcome(application.driveId, application.id, outcome).subscribe({
+      next: updated => {
+        this.applications.update(items => items.map(item => item.id === updated.id ? { ...item, status: updated.status } : item));
+        this.candidates.update(items => items.map(item => item.applicationId === updated.id ? { ...item, applicationStatus: updated.status, result: outcome === 'SELECTED' ? 'PASSED' : 'FAILED' } : item));
+        this.finishSave(`Application marked ${outcome === 'SELECTED' ? 'selected' : 'not selected'}.`);
+      },
+      error: error => this.failSave(error.error?.detail ?? error.error?.message
+        ?? 'The drive must not be cancelled, the final round must be published, and the student must have passed all previous rounds before recording an outcome.')
+    });
+  }
+
+  bulkApplicationOutcome(outcome: 'SELECTED' | 'REJECTED'): void {
+    const ids = this.selectedApplicationIds();
+    if (!ids.length || !confirm(`${outcome === 'SELECTED' ? 'Select' : 'Reject'} ${ids.length} application(s)?`)) return;
+    const selected = this.applications().filter(application => ids.includes(application.id));
+    this.startSave();
+    forkJoin(selected.map(application => this.placementService.setFinalOutcome(application.driveId, application.id, outcome))).subscribe({
+      next: updated => {
+        const updatedById = new Map(updated.map(application => [application.id, application.status]));
+        this.applications.update(items => items.map(item => updatedById.has(item.id) ? { ...item, status: updatedById.get(item.id)! } : item));
+        this.candidates.update(items => items.map(item => updatedById.has(item.applicationId) ? { ...item, applicationStatus: updatedById.get(item.applicationId)!, result: outcome === 'SELECTED' ? 'PASSED' : 'FAILED' } : item));
+        this.clearApplicationSelection();
+        this.finishSave(`${updated.length} application(s) updated.`);
+      },
+      error: error => this.failSave(error.error?.detail ?? error.error?.message ?? 'One or more applications could not be updated. Confirm the final-round rules for the selected students.')
     });
   }
 

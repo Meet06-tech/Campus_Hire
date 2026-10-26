@@ -87,6 +87,21 @@ public class PlacementService {
     }
 
     @Transactional
+    public DriveResponse cancelDrive(Authentication auth, Long driveId) {
+        UserAccount user = authorization.staff(auth);
+        PlacementDrive drive = drives.findById(driveId).orElseThrow(() -> notFound("Placement drive"));
+        if (user.getRole() == UserRole.DTPO) {
+            Department department = requireDepartment(user);
+            if (drive.getDepartment() == null || !department.getId().equals(drive.getDepartment().getId()))
+                throw forbidden("DTPO cannot cancel a drive outside its department");
+        }
+        if (drive.getStatus() != DriveStatus.DRAFT && drive.getStatus() != DriveStatus.PUBLISHED)
+            throw bad("Only draft or published drives can be cancelled");
+        drive.setStatus(DriveStatus.CANCELLED);
+        return drive(drive);
+    }
+
+    @Transactional
     public DriveResponse publishDrive(Authentication auth, Long driveId) {
         UserAccount user = authorization.staff(auth);
         PlacementDrive drive = drives.findById(driveId).orElseThrow(() -> notFound("Placement drive"));
@@ -102,6 +117,7 @@ public class PlacementService {
     public List<DriveResponse> listStudentDrives(Authentication auth) {
         Student student = authorization.student(auth);
         return drives.findVisiblePublished(DriveStatus.PUBLISHED, student.getDepartment().getId()).stream()
+                .filter(d -> d.getStatus() == DriveStatus.PUBLISHED)
                 .filter(d -> eligible(student, d)).map(this::drive).toList();
     }
 
@@ -125,12 +141,16 @@ public class PlacementService {
 
     @Transactional(readOnly = true)
     public StaffApplicationPageResponse listStaffApplications(Authentication auth, int page, int size,
-            String search, ApplicationStatus status) {
+            String search, ApplicationStatus status, Long companyId,
+            BigDecimal minCgpa, BigDecimal maxCgpa) {
         UserAccount user = authorization.staff(auth);
         Pageable pageable = PageRequest.of(page, size);
         Long departmentId = scopedDepartmentId(user);
         String normalizedSearch = search == null || search.isBlank() ? null : search.trim();
-        Page<StaffApplicationProjection> result = applications.findStaffApplications(departmentId, status, normalizedSearch, pageable);
+        if (minCgpa != null && maxCgpa != null && minCgpa.compareTo(maxCgpa) > 0)
+            throw bad("Minimum CGPA cannot exceed maximum CGPA");
+        Page<StaffApplicationProjection> result = applications.findStaffApplications(departmentId, status, companyId,
+                minCgpa, maxCgpa, normalizedSearch, pageable);
         return new StaffApplicationPageResponse(result.getContent().stream().map(this::staffApplication).toList(),
                 result.getNumber(), result.getSize(), result.getTotalElements(), result.getTotalPages());
     }
@@ -237,7 +257,8 @@ public class PlacementService {
     private StaffApplicationResponse staffApplication(StaffApplicationProjection p) {
         return new StaffApplicationResponse(p.getApplicationId(), p.getStudentId(), p.getStudentName(), p.getUniversityEmail(),
                 p.getEnrollmentNumber(), p.getDepartmentId(), p.getDepartmentCode(), p.getDepartmentName(), p.getAcademicProgram(),
-                p.getDriveId(), p.getDriveTitle(), p.getCompanyName(), p.getAppliedAt(), p.getStatus());
+                p.getDriveId(), p.getDriveTitle(), p.getCompanyName(), p.getAppliedAt(), p.getStatus(),
+                p.getStudentCgpa(), p.getStudentGraduationYear());
     }
     private StaffStudentResponse staffStudent(StaffStudentProjection p) {
         return new StaffStudentResponse(p.getStudentId(), p.getFullName(), p.getUniversityEmail(), p.getEnrollmentNumber(),

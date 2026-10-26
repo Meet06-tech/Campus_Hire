@@ -20,14 +20,34 @@ class StudentHomeShell extends StatefulWidget {
   State<StudentHomeShell> createState() => _StudentHomeShellState();
 }
 
-class _StudentHomeShellState extends State<StudentHomeShell> {
+class _StudentHomeShellState extends State<StudentHomeShell>
+    with WidgetsBindingObserver {
   int _selectedIndex = 0;
+  int _refreshKey = 0;
   Uint8List? _photoBytes;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadPhoto();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      setState(() => _refreshKey++);
+    }
+  }
+
+  void _refreshPlacementData() {
+    if (mounted) setState(() => _refreshKey++);
   }
 
   Future<void> _loadPhoto() async {
@@ -42,13 +62,20 @@ class _StudentHomeShellState extends State<StudentHomeShell> {
   @override
   Widget build(BuildContext context) {
     final pages = <Widget>[
-      StudentDrivesTab(api: widget.api, onSessionExpired: widget.onLogout),
+      StudentDrivesTab(
+        key: ValueKey('drives-$_refreshKey'),
+        api: widget.api,
+        onSessionExpired: widget.onLogout,
+        onApplicationChanged: _refreshPlacementData,
+      ),
       ApplicationsTab(
+        key: ValueKey('applied-$_refreshKey'),
         api: widget.api,
         onSessionExpired: widget.onLogout,
         title: 'Applied applications',
       ),
       ApplicationsTab(
+        key: ValueKey('history-$_refreshKey'),
         api: widget.api,
         onSessionExpired: widget.onLogout,
         title: 'Application history',
@@ -70,8 +97,10 @@ class _StudentHomeShellState extends State<StudentHomeShell> {
       body: IndexedStack(index: _selectedIndex, children: pages),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) =>
-            setState(() => _selectedIndex = index),
+        onDestinationSelected: (index) => setState(() {
+          _selectedIndex = index;
+          _refreshKey++;
+        }),
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.home_outlined),
@@ -181,10 +210,12 @@ class StudentDrivesTab extends StatefulWidget {
     super.key,
     required this.api,
     required this.onSessionExpired,
+    required this.onApplicationChanged,
   });
 
   final PlacementApi api;
   final VoidCallback onSessionExpired;
+  final VoidCallback onApplicationChanged;
 
   @override
   State<StudentDrivesTab> createState() => _StudentDrivesTabState();
@@ -253,15 +284,20 @@ class _StudentDrivesTabState extends State<StudentDrivesTab> {
             padding: const EdgeInsets.only(bottom: 12),
             child: _DriveCard(
               drive: drive,
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => DriveDetailsPage(
-                    api: widget.api,
-                    drive: drive,
-                    onSessionExpired: widget.onSessionExpired,
-                  ),
-                ),
-              ),
+              onTap: () => Navigator.of(context)
+                  .push(
+                    MaterialPageRoute(
+                      builder: (_) => DriveDetailsPage(
+                        api: widget.api,
+                        drive: drive,
+                        onSessionExpired: widget.onSessionExpired,
+                        onApplicationChanged: widget.onApplicationChanged,
+                      ),
+                    ),
+                  )
+                  .then((_) {
+                    if (mounted) _loadDrives();
+                  }),
             ),
           );
         },
@@ -276,11 +312,13 @@ class DriveDetailsPage extends StatefulWidget {
     required this.api,
     required this.drive,
     required this.onSessionExpired,
+    required this.onApplicationChanged,
   });
 
   final PlacementApi api;
   final PlacementDrive drive;
   final VoidCallback onSessionExpired;
+  final VoidCallback onApplicationChanged;
 
   @override
   State<DriveDetailsPage> createState() => _DriveDetailsPageState();
@@ -297,6 +335,7 @@ class _DriveDetailsPageState extends State<DriveDetailsPage> {
     });
     try {
       await widget.api.applyToDrive(widget.drive.id);
+      widget.onApplicationChanged();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Application submitted successfully.')),
@@ -401,24 +440,34 @@ class _DriveDetailsPageState extends State<DriveDetailsPage> {
             ),
           ],
           const SizedBox(height: 24),
-          SizedBox(
-            height: 54,
-            child: FilledButton.icon(
-              onPressed: _applying ? null : _apply,
-              icon: _applying
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.send_rounded),
-              label: Text(
-                _applying
-                    ? 'Submitting application...'
-                    : 'Apply for this drive',
+          if (drive.status == 'PUBLISHED')
+            SizedBox(
+              height: 54,
+              child: FilledButton.icon(
+                onPressed: _applying ? null : _apply,
+                icon: _applying
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.send_rounded),
+                label: Text(
+                  _applying
+                      ? 'Submitting application...'
+                      : 'Apply for this drive',
+                ),
               ),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Text('Applications are closed for this drive.'),
             ),
-          ),
         ],
       ),
     );
@@ -819,8 +868,8 @@ class _ApplicationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final status = application.finalOutcome ?? application.applicationStatus;
-    final statusColor = _statusColor(colors, status);
+    final statusColor = _statusColor(colors, application);
+    final statusLabel = _applicationStatusLabel(application);
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
@@ -872,7 +921,7 @@ class _ApplicationCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    _applicationStatusLabel(status),
+                    statusLabel,
                     style: TextStyle(
                       color: statusColor,
                       fontWeight: FontWeight.w700,
@@ -951,17 +1000,19 @@ class _RoundProgressRow extends StatelessWidget {
   }
 }
 
-String _applicationStatusLabel(String status) {
-  switch (status) {
-    case 'SELECTED':
-      return 'Selected';
-    case 'REJECTED':
-      return 'Not selected';
-    case 'WITHDRAWN':
-      return 'Withdrawn';
-    default:
-      return 'In progress';
+String _applicationStatusLabel(StudentApplicationProgress application) {
+  if (application.finalOutcome == 'SELECTED' ||
+      application.applicationStatus == 'SELECTED') {
+    return 'Selected';
   }
+  if (application.finalOutcome == 'NOT_SELECTED' ||
+      application.applicationStatus == 'REJECTED') {
+    return 'Not selected';
+  }
+  if (application.applicationStatus == 'WITHDRAWN') {
+    return 'Withdrawn';
+  }
+  return 'In progress';
 }
 
 String _roundStatusLabel(String status) {
@@ -977,19 +1028,25 @@ String _roundStatusLabel(String status) {
   }
 }
 
-Color _statusColor(ColorScheme colors, String status) {
-  switch (status.toUpperCase()) {
-    case 'SELECTED':
-      return Colors.green.shade700;
-    case 'REJECTED':
-      return colors.error;
-    case 'SHORTLISTED':
-      return Colors.orange.shade800;
-    case 'WITHDRAWN':
-      return colors.onSurfaceVariant;
-    default:
-      return colors.primary;
+Color _statusColor(
+  ColorScheme colors,
+  StudentApplicationProgress application,
+) {
+  if (application.finalOutcome == 'SELECTED' ||
+      application.applicationStatus == 'SELECTED') {
+    return Colors.green.shade700;
   }
+  if (application.finalOutcome == 'NOT_SELECTED' ||
+      application.applicationStatus == 'REJECTED') {
+    return colors.error;
+  }
+  if (application.applicationStatus == 'SHORTLISTED') {
+    return Colors.orange.shade800;
+  }
+  if (application.applicationStatus == 'WITHDRAWN') {
+    return colors.onSurfaceVariant;
+  }
+  return colors.primary;
 }
 
 class _InfoPill extends StatelessWidget {

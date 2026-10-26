@@ -23,13 +23,17 @@ public interface PlacementApplicationRepository extends JpaRepository<PlacementA
         select a.id as applicationId, s.id as studentId, u.fullName as studentName,
                u.universityEmail as universityEmail, s.enrollmentNumber as enrollmentNumber,
                d.id as departmentId, d.code as departmentCode, d.name as departmentName,
-               s.academicProgram as academicProgram, drive.id as driveId, drive.title as driveTitle,
+               s.academicProgram as academicProgram, s.cgpa as studentCgpa, s.graduationYear as studentGraduationYear,
+               drive.id as driveId, drive.title as driveTitle,
                c.name as companyName, a.appliedAt as appliedAt, a.status as status
         from PlacementApplication a
         join a.student s join s.user u join s.department d
         join a.drive drive join drive.company c
         where (:departmentId is null or drive.department.id = :departmentId)
           and (:status is null or a.status = :status)
+          and (:companyId is null or c.id = :companyId)
+          and (:minCgpa is null or s.cgpa >= :minCgpa)
+          and (:maxCgpa is null or s.cgpa <= :maxCgpa)
           and (cast(:search as String) is null or lower(u.fullName) like lower(concat('%', cast(:search as String), '%'))
                or lower(s.enrollmentNumber) like lower(concat('%', cast(:search as String), '%'))
                or lower(drive.title) like lower(concat('%', cast(:search as String), '%'))
@@ -37,5 +41,7 @@ public interface PlacementApplicationRepository extends JpaRepository<PlacementA
         order by a.appliedAt desc
         """)
     Page<StaffApplicationProjection> findStaffApplications(@Param("departmentId") Long departmentId,
-            @Param("status") ApplicationStatus status, @Param("search") String search, Pageable pageable);
+            @Param("status") ApplicationStatus status, @Param("companyId") Long companyId,
+            @Param("minCgpa") java.math.BigDecimal minCgpa, @Param("maxCgpa") java.math.BigDecimal maxCgpa,
+            @Param("search") String search, Pageable pageable);
 }

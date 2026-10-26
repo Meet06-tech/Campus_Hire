@@ -1,6 +1,7 @@
 package com.placementmanagement.api.placement.controller;
 
 import java.util.List;
+import java.math.BigDecimal;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -65,9 +66,9 @@ public class PlacementController {
         return recruitment.publishRound(auth, driveId, roundId);
     }
     @PutMapping("/drives/{driveId}/applications/{applicationId}/outcome")
-    public void finalOutcome(@PathVariable Long driveId, @PathVariable Long applicationId,
+    public ApplicationResponse finalOutcome(@PathVariable Long driveId, @PathVariable Long applicationId,
             @RequestBody FinalOutcomeRequest request, Authentication auth) {
-        recruitment.setFinalOutcome(auth, driveId, applicationId, request);
+        return recruitment.setFinalOutcome(auth, driveId, applicationId, request);
     }
     @GetMapping("/student/applications/progress")
     public List<StudentApplicationProgress> studentProgress(Authentication auth) {
@@ -84,6 +85,8 @@ public class PlacementController {
     public List<DriveResponse> staffDrives(Authentication auth) { return service.listStaffDrives(auth); }
     @PostMapping("/drives/{driveId}/publish")
     public DriveResponse publishDrive(@PathVariable Long driveId, Authentication auth) { return service.publishDrive(auth, driveId); }
+    @PostMapping("/drives/{driveId}/cancel")
+    public DriveResponse cancelDrive(@PathVariable Long driveId, Authentication auth) { return service.cancelDrive(auth, driveId); }
     @GetMapping("/student/drives")
     public List<DriveResponse> studentDrives(Authentication auth) { return service.listStudentDrives(auth); }
     @PostMapping("/student/drives/{driveId}/applications") @ResponseStatus(HttpStatus.CREATED)
@@ -93,9 +96,12 @@ public class PlacementController {
     @GetMapping("/applications")
     public StaffApplicationPageResponse staffApplications(@RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "25") int size, @RequestParam(required = false) String search,
-            @RequestParam(required = false) ApplicationStatus status, Authentication auth) {
+            @RequestParam(required = false) ApplicationStatus status,
+            @RequestParam(required = false) Long companyId,
+            @RequestParam(required = false) BigDecimal minCgpa,
+            @RequestParam(required = false) BigDecimal maxCgpa, Authentication auth) {
         if (page < 0 || size < 1 || size > 100) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid pagination parameters");
-        return service.listStaffApplications(auth, page, size, search, status);
+        return service.listStaffApplications(auth, page, size, search, status, companyId, minCgpa, maxCgpa);
     }
     @GetMapping("/students")
     public StaffStudentPageResponse staffStudents(@RequestParam(defaultValue = "0") int page,

@@ -115,8 +115,10 @@ public class RecruitmentService {
     }
 
     @Transactional
-    public void setFinalOutcome(Authentication auth, Long driveId, Long applicationId, FinalOutcomeRequest request) {
+    public ApplicationResponse setFinalOutcome(Authentication auth, Long driveId, Long applicationId, FinalOutcomeRequest request) {
         PlacementDrive drive = managedDrive(auth, driveId);
+        if (drive.getStatus() == DriveStatus.CANCELLED)
+            throw bad("Cancelled drives cannot receive final outcomes");
         if (request == null || (request.outcome() != ApplicationStatus.SELECTED && request.outcome() != ApplicationStatus.REJECTED))
             throw bad("Final outcome must be SELECTED or REJECTED");
         RecruitmentRound finalRound = rounds.findAllByDrive_IdOrderByOrderAsc(driveId).stream()
@@ -126,10 +128,19 @@ public class RecruitmentService {
         PlacementApplication application = applications.findById(applicationId)
                 .orElseThrow(() -> notFound("Application"));
         if (!Objects.equals(application.getDrive().getId(), drive.getId())) throw notFound("Application");
-        RoundResult finalResult = results.findByRound_IdAndApplication_Id(finalRound.getId(), applicationId)
-                .orElseThrow(() -> bad("Record a final-round result first"));
-        if (finalResult.getResult() != RoundResultStatus.PASSED) throw bad("Only a student who passed the final round can receive an outcome");
+        if (application.getStatus() == ApplicationStatus.WITHDRAWN)
+            throw bad("Withdrawn applications cannot receive final outcomes");
+        if (!passedAllPreviousRounds(application, drive, finalRound))
+            throw bad("Only a student who passed all previous rounds can receive an outcome");
         application.setStatus(request.outcome());
+        applications.save(application);
+        RoundResult finalResult = results.findByRound_IdAndApplication_Id(finalRound.getId(), application.getId())
+                .orElseGet(() -> new RoundResult(finalRound, application));
+        UserAccount recorder = authorization.staff(auth);
+        finalResult.update(request.outcome() == ApplicationStatus.SELECTED ? RoundResultStatus.PASSED : RoundResultStatus.FAILED, recorder);
+        results.save(finalResult);
+        return new ApplicationResponse(application.getId(), application.getDrive().getId(), application.getStudent().getId(),
+                application.getAppliedAt(), application.getStatus());
     }
 
     @Transactional(readOnly = true)
@@ -148,7 +159,11 @@ public class RecruitmentService {
                                 case PASSED -> "CLEARED";
                                 case FAILED -> "NOT_CLEARED";
                                 case PENDING -> "AWAITING_RESULT";
-                            }).orElse("AWAITING_RESULT");
+                            }).orElse(round.isFinalRound()
+                                    ? (application.getStatus() == ApplicationStatus.SELECTED ? "CLEARED"
+                                            : application.getStatus() == ApplicationStatus.REJECTED ? "NOT_CLEARED"
+                                            : "AWAITING_RESULT")
+                                    : "AWAITING_RESULT");
                     return new StudentRoundProgress(round.getId(), round.getOrder(), round.getName(), round.isResultsPublished(), status);
                 }).toList();
         String finalOutcome = application.getStatus() == ApplicationStatus.SELECTED ? "SELECTED"
@@ -161,8 +176,18 @@ public class RecruitmentService {
     private List<PlacementApplication> candidateApplications(RecruitmentRound round, PlacementDrive drive) {
         return applications.findAllByDrive_IdOrderByAppliedAtAsc(drive.getId()).stream()
                 .filter(application -> application.getStatus() != ApplicationStatus.WITHDRAWN)
-                .filter(application -> round.getOrder() == 1 || passedPreviousRound(application, drive, round))
+                .filter(application -> round.getOrder() == 1 || (round.isFinalRound()
+                        ? passedAllPreviousRounds(application, drive, round)
+                        : passedPreviousRound(application, drive, round)))
                 .toList();
+    }
+
+    private boolean passedAllPreviousRounds(PlacementApplication application, PlacementDrive drive,
+            RecruitmentRound finalRound) {
+        return rounds.findAllByDrive_IdOrderByOrderAsc(drive.getId()).stream()
+                .filter(round -> round.getOrder() < finalRound.getOrder())
+                .allMatch(round -> results.findByRound_IdAndApplication_Id(round.getId(), application.getId())
+                        .map(result -> result.getResult() == RoundResultStatus.PASSED).orElse(false));
     }
 
     private boolean passedPreviousRound(PlacementApplication application, PlacementDrive drive, RecruitmentRound current) {
@@ -176,14 +201,23 @@ public class RecruitmentService {
     private CandidateResponse candidate(RecruitmentRound round, PlacementApplication application) {
         Student student = application.getStudent();
         Optional<RoundResult> result = results.findByRound_IdAndApplication_Id(round.getId(), application.getId());
+        RoundResultStatus roundResult = result.map(RoundResult::getResult).orElse(round.isFinalRound()
+                ? (application.getStatus() == ApplicationStatus.SELECTED ? RoundResultStatus.PASSED
+                        : application.getStatus() == ApplicationStatus.REJECTED ? RoundResultStatus.FAILED
+                        : RoundResultStatus.PENDING)
+                : RoundResultStatus.PENDING);
         return new CandidateResponse(application.getId(), student.getId(), student.getUser().getFullName(),
-                student.getEnrollmentNumber(), student.getAcademicProgram(), result.map(RoundResult::getResult).orElse(RoundResultStatus.PENDING));
+                student.getEnrollmentNumber(), student.getAcademicProgram(), roundResult, application.getStatus());
     }
 
     private RoundResponse roundResponse(RecruitmentRound round, List<PlacementApplication> candidates) {
         Map<RoundResultStatus, Long> counts = candidates.stream()
                 .map(application -> results.findByRound_IdAndApplication_Id(round.getId(), application.getId())
-                        .map(RoundResult::getResult).orElse(RoundResultStatus.PENDING))
+                        .map(RoundResult::getResult).orElse(round.isFinalRound()
+                                ? (application.getStatus() == ApplicationStatus.SELECTED ? RoundResultStatus.PASSED
+                                        : application.getStatus() == ApplicationStatus.REJECTED ? RoundResultStatus.FAILED
+                                        : RoundResultStatus.PENDING)
+                                : RoundResultStatus.PENDING))
                 .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
         return new RoundResponse(round.getId(), round.getDrive().getId(), round.getOrder(), round.getName(), round.isFinalRound(),
                 round.isResultsPublished(), candidates.size(), counts.getOrDefault(RoundResultStatus.PASSED, 0L),

@@ -20,7 +20,8 @@ public final class PlacementDtos {
     public record StaffApplicationResponse(Long id, Long studentId, String studentName, String universityEmail,
             String enrollmentNumber, Long departmentId, String departmentCode, String departmentName,
             String academicProgram, Long driveId, String driveTitle, String companyName,
-            Instant appliedAt, ApplicationStatus status) {}
+            Instant appliedAt, ApplicationStatus status, BigDecimal studentCgpa,
+            Short studentGraduationYear) {}
     public record StaffApplicationPageResponse(List<StaffApplicationResponse> items, int page, int size,
             long totalElements, int totalPages) {}
     public record StaffStudentResponse(Long id, String fullName, String universityEmail, String enrollmentNumber,
@@ -37,7 +38,8 @@ public final class PlacementDtos {
     public record RoundResponse(Long id, Long driveId, Integer order, String name, boolean finalRound,
             boolean resultsPublished, long totalCandidates, long passed, long failed, long pending) {}
     public record CandidateResponse(Long applicationId, Long studentId, String studentName,
-            String enrollmentNumber, String academicProgram, RoundResultStatus result) {}
+            String enrollmentNumber, String academicProgram, RoundResultStatus result,
+            ApplicationStatus applicationStatus) {}
     public record RoundResultRequest(RoundResultStatus result) {}
     public record FinalOutcomeRequest(ApplicationStatus outcome) {}
     public record RoundResultResponse(Long roundId, Long applicationId, RoundResultStatus result,
@@ -63,6 +65,8 @@ public final class PlacementDtos {
         String getCompanyName();
         Instant getAppliedAt();
         ApplicationStatus getStatus();
+        BigDecimal getStudentCgpa();
+        Short getStudentGraduationYear();
     }
 
     public interface StaffStudentProjection {
