@@ -5,16 +5,21 @@ import 'package:flutter/material.dart';
 import '../models/placement_models.dart';
 import '../services/placement_api.dart';
 import 'profile_page.dart';
+import 'settings_page.dart';
 
 class StudentHomeShell extends StatefulWidget {
   const StudentHomeShell({
     super.key,
     required this.api,
     required this.onLogout,
+    this.themeMode = ThemeMode.light,
+    this.onThemeModeChanged,
   });
 
   final PlacementApi api;
   final VoidCallback onLogout;
+  final ThemeMode themeMode;
+  final ValueChanged<ThemeMode>? onThemeModeChanged;
 
   @override
   State<StudentHomeShell> createState() => _StudentHomeShellState();
@@ -73,12 +78,14 @@ class _StudentHomeShellState extends State<StudentHomeShell>
         api: widget.api,
         onSessionExpired: widget.onLogout,
         title: 'Applied applications',
+        historyOnly: false,
       ),
       ApplicationsTab(
         key: ValueKey('history-$_refreshKey'),
         api: widget.api,
         onSessionExpired: widget.onLogout,
         title: 'Application history',
+        historyOnly: true,
       ),
     ];
     return Scaffold(
@@ -89,6 +96,15 @@ class _StudentHomeShellState extends State<StudentHomeShell>
             builder: (_) => ProfilePage(
               api: widget.api,
               onPhotoChanged: (photo) => setState(() => _photoBytes = photo),
+            ),
+          ),
+        ),
+        onSettings: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => SettingsPage(
+              themeMode: widget.themeMode,
+              onThemeChanged: widget.onThemeModeChanged ?? (_) {},
+              onLogout: widget.onLogout,
             ),
           ),
         ),
@@ -127,11 +143,13 @@ class _CampusHireAppBar extends StatelessWidget implements PreferredSizeWidget {
   const _CampusHireAppBar({
     required this.photoBytes,
     required this.onProfile,
+    required this.onSettings,
     required this.onLogout,
   });
 
   final Uint8List? photoBytes;
   final VoidCallback onProfile;
+  final VoidCallback onSettings;
   final VoidCallback onLogout;
 
   @override
@@ -170,10 +188,12 @@ class _CampusHireAppBar extends StatelessWidget implements PreferredSizeWidget {
           ),
           onSelected: (value) {
             if (value == 'profile') onProfile();
+            if (value == 'settings') onSettings();
             if (value == 'logout') _confirmLogout(context);
           },
           itemBuilder: (_) => const [
             PopupMenuItem(value: 'profile', child: Text('View Profile')),
+            PopupMenuItem(value: 'settings', child: Text('Settings')),
             PopupMenuItem(value: 'logout', child: Text('Logout')),
           ],
         ),
@@ -480,11 +500,13 @@ class ApplicationsTab extends StatefulWidget {
     required this.api,
     required this.onSessionExpired,
     required this.title,
+    required this.historyOnly,
   });
 
   final PlacementApi api;
   final VoidCallback onSessionExpired;
   final String title;
+  final bool historyOnly;
 
   @override
   State<ApplicationsTab> createState() => _ApplicationsTabState();
@@ -507,7 +529,9 @@ class _ApplicationsTabState extends State<ApplicationsTab> {
       _error = null;
     });
     try {
-      final applications = await widget.api.fetchMyApplicationProgress();
+      final applications = widget.historyOnly
+          ? await widget.api.fetchMyApplicationHistory()
+          : await widget.api.fetchMyApplicationProgress();
       if (mounted) setState(() => _applications = applications);
     } on ApiException catch (error) {
       if (error.statusCode == 401) {
@@ -522,17 +546,56 @@ class _ApplicationsTabState extends State<ApplicationsTab> {
     }
   }
 
+  Future<void> _decideOffer(
+    String decision,
+    StudentApplicationProgress application,
+  ) async {
+    final action = decision == 'ACCEPTED' ? 'accept' : 'decline';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('${action[0].toUpperCase()}${action.substring(1)} offer?'),
+        content: Text('This decision cannot be changed later.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(action[0].toUpperCase() + action.substring(1)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await widget.api.decideOffer(application.id, decision);
+      await _loadApplications();
+    } on ApiException catch (error) {
+      if (error.statusCode == 401) {
+        widget.onSessionExpired();
+      } else if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
       return _ErrorState(message: _error!, onRetry: _loadApplications);
     }
-    if (_applications.isEmpty) {
+    final visibleApplications = _applications;
+    if (visibleApplications.isEmpty) {
       return _EmptyState(
         icon: Icons.assignment_outlined,
         title: widget.title,
-        message: 'Your applications will appear here.',
+        message: widget.historyOnly
+            ? 'Completed placement outcomes will appear here.'
+            : 'Your applications will appear here.',
       );
     }
     return RefreshIndicator(
@@ -548,10 +611,144 @@ class _ApplicationsTabState extends State<ApplicationsTab> {
                   ?.copyWith(fontWeight: FontWeight.w700),
             ),
           ),
-          ..._applications.map(
-            (application) => _ApplicationCard(application: application),
+          ...visibleApplications.map(
+            (application) => widget.historyOnly
+                ? _HistoryApplicationCard(
+                    application: application,
+                    onDecision: (decision) =>
+                        _decideOffer(decision, application),
+                  )
+                : _ApplicationCard(application: application),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _HistoryApplicationCard extends StatelessWidget {
+  const _HistoryApplicationCard({
+    required this.application,
+    required this.onDecision,
+  });
+
+  final StudentApplicationProgress application;
+  final ValueChanged<String> onDecision;
+
+  @override
+  Widget build(BuildContext context) {
+    final selected =
+        application.finalOutcome == 'SELECTED' ||
+        application.applicationStatus == 'SELECTED';
+    final colors = Theme.of(context).colorScheme;
+    final normalizedOfferStatus = (application.offerStatus ?? 'PENDING')
+        .toUpperCase();
+    final offerPending = selected && normalizedOfferStatus == 'PENDING';
+    final offerLabel = switch (normalizedOfferStatus) {
+      'ACCEPTED' => 'Offer Accepted',
+      'DECLINED' => 'Offer Declined',
+      _ => 'Offer Pending',
+    };
+    final offerBadgeBackground = switch (normalizedOfferStatus) {
+      'ACCEPTED' => Colors.green.shade50,
+      'DECLINED' => Colors.red.shade50,
+      _ => colors.primaryContainer,
+    };
+    final offerBadgeText = switch (normalizedOfferStatus) {
+      'ACCEPTED' => Colors.green.shade700,
+      'DECLINED' => Colors.red.shade700,
+      _ => colors.onPrimaryContainer,
+    };
+    final companyResult = selected ? 'Selected' : 'Rejected';
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Column(
+          children: [
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: CircleAvatar(
+                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                child: Icon(
+                  Icons.business_outlined,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+              title: Text(
+                application.companyName,
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+              subtitle: Text('Applied ${_formatDate(application.appliedAt)}'),
+              trailing: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? offerBadgeBackground
+                      : colors.errorContainer,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  selected ? offerLabel : 'Not Selected',
+                  style: TextStyle(
+                    color: selected ? offerBadgeText : colors.onErrorContainer,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Company result: $companyResult',
+                style: TextStyle(color: colors.onSurfaceVariant, fontSize: 13),
+              ),
+            ),
+            if (offerPending) ...[
+              const Divider(),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Offer decision',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => onDecision('DECLINED'),
+                      child: const Text('Decline'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () => onDecision('ACCEPTED'),
+                      child: const Text('Accept'),
+                    ),
+                  ),
+                ],
+              ),
+            ] else if (selected && normalizedOfferStatus != 'PENDING')
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Decision recorded ${application.offerDecidedAt == null ? '' : 'on ${_formatDate(application.offerDecidedAt)}'}'
+                      .trim(),
+                  style: TextStyle(
+                    color: colors.onSurfaceVariant,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -1028,10 +1225,7 @@ String _roundStatusLabel(String status) {
   }
 }
 
-Color _statusColor(
-  ColorScheme colors,
-  StudentApplicationProgress application,
-) {
+Color _statusColor(ColorScheme colors, StudentApplicationProgress application) {
   if (application.finalOutcome == 'SELECTED' ||
       application.applicationStatus == 'SELECTED') {
     return Colors.green.shade700;

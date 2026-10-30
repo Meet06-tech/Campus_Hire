@@ -147,6 +147,17 @@ public class RecruitmentService {
     public List<StudentApplicationProgress> studentProgress(Authentication auth) {
         Student student = authorization.student(auth);
         return applications.findAllByStudent_IdOrderByAppliedAtDesc(student.getId()).stream()
+                .filter(application -> application.getStatus() != ApplicationStatus.SELECTED
+                        && application.getStatus() != ApplicationStatus.REJECTED)
+                .map(this::progress).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<StudentApplicationProgress> studentHistory(Authentication auth) {
+        Student student = authorization.student(auth);
+        return applications.findAllByStudent_IdOrderByAppliedAtDesc(student.getId()).stream()
+                .filter(application -> application.getStatus() == ApplicationStatus.SELECTED
+                        || application.getStatus() == ApplicationStatus.REJECTED)
                 .map(this::progress).toList();
     }
 
@@ -170,7 +181,7 @@ public class RecruitmentService {
                 : application.getStatus() == ApplicationStatus.REJECTED ? "NOT_SELECTED" : null;
         return new StudentApplicationProgress(application.getId(), application.getDrive().getId(),
                 application.getDrive().getCompany().getName(), application.getDrive().getTitle(), application.getAppliedAt(),
-                application.getStatus(), finalOutcome, progress);
+                application.getStatus(), finalOutcome, application.getOfferStatus(), application.getOfferDecidedAt(), progress);
     }
 
     private List<PlacementApplication> candidateApplications(RecruitmentRound round, PlacementDrive drive) {

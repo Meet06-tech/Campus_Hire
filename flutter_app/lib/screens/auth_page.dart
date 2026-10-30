@@ -5,9 +5,16 @@ import '../services/placement_api.dart';
 import 'student_home.dart';
 
 class AuthPage extends StatefulWidget {
-  const AuthPage({super.key, required this.api});
+  const AuthPage({
+    super.key,
+    required this.api,
+    this.themeMode = ThemeMode.light,
+    this.onThemeModeChanged,
+  });
 
   final PlacementApi api;
+  final ThemeMode themeMode;
+  final ValueChanged<ThemeMode>? onThemeModeChanged;
 
   @override
   State<AuthPage> createState() => _AuthPageState();
@@ -18,6 +25,7 @@ class _AuthPageState extends State<AuthPage> {
   final _enrollment = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _confirmPassword = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _registering = false;
   bool _loading = false;
@@ -29,6 +37,7 @@ class _AuthPageState extends State<AuthPage> {
     _enrollment.dispose();
     _email.dispose();
     _password.dispose();
+    _confirmPassword.dispose();
     super.dispose();
   }
 
@@ -45,6 +54,7 @@ class _AuthPageState extends State<AuthPage> {
               enrollmentNumber: _enrollment.text.trim(),
               universityEmail: _email.text.trim(),
               password: _password.text,
+              confirmPassword: _confirmPassword.text,
             )
           : await widget.api.login(_enrollment.text.trim(), _password.text);
       if (!_registering && data['token'] is String) {
@@ -55,6 +65,8 @@ class _AuthPageState extends State<AuthPage> {
             builder: (_) => StudentHomeShell(
               api: widget.api,
               onLogout: () => _logout(),
+              themeMode: widget.themeMode,
+              onThemeModeChanged: widget.onThemeModeChanged,
             ),
           ),
         );
@@ -75,7 +87,13 @@ class _AuthPageState extends State<AuthPage> {
   void _logout() {
     widget.api.clearToken();
     appNavigatorKey.currentState?.pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => AuthPage(api: widget.api)),
+      MaterialPageRoute(
+        builder: (_) => AuthPage(
+          api: widget.api,
+          themeMode: widget.themeMode,
+          onThemeModeChanged: widget.onThemeModeChanged,
+        ),
+      ),
       (_) => false,
     );
   }
@@ -89,6 +107,25 @@ class _AuthPageState extends State<AuthPage> {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     return Scaffold(
+      appBar: widget.onThemeModeChanged == null
+          ? null
+          : AppBar(
+              actions: [
+                IconButton(
+                  onPressed: () => widget.onThemeModeChanged!(
+                    widget.themeMode == ThemeMode.dark
+                        ? ThemeMode.light
+                        : ThemeMode.dark,
+                  ),
+                  icon: Icon(
+                    widget.themeMode == ThemeMode.dark
+                        ? Icons.light_mode_rounded
+                        : Icons.dark_mode_rounded,
+                  ),
+                  tooltip: 'Toggle theme',
+                ),
+              ],
+            ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -109,16 +146,29 @@ class _AuthPageState extends State<AuthPage> {
                     const Text(
                       'CampusHire',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     const SizedBox(height: 4),
-                    const Text('Placement Management System', textAlign: TextAlign.center),
+                    const Text(
+                      'Placement Management System',
+                      textAlign: TextAlign.center,
+                    ),
                     const SizedBox(height: 16),
-                    Text(
-                      _registering ? 'Create student account' : 'Welcome back',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 240),
+                      transitionBuilder: (child, animation) =>
+                          FadeTransition(opacity: animation, child: child),
+                      child: Text(
+                        _registering
+                            ? 'Create student account'
+                            : 'Welcome back',
+                        key: ValueKey(_registering),
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.w800),
+                      ),
                     ),
                     const SizedBox(height: 6),
                     Text(
@@ -132,22 +182,30 @@ class _AuthPageState extends State<AuthPage> {
                       TextFormField(
                         controller: _name,
                         textCapitalization: TextCapitalization.words,
-                        decoration: const InputDecoration(labelText: 'Full name'),
+                        decoration: const InputDecoration(
+                          labelText: 'Full name',
+                        ),
                         validator: (value) => _required(value, 'Full name'),
                       ),
                       const SizedBox(height: 14),
                       TextFormField(
                         controller: _email,
                         keyboardType: TextInputType.emailAddress,
-                        decoration: const InputDecoration(labelText: 'University email'),
-                        validator: (value) => _required(value, 'University email'),
+                        decoration: const InputDecoration(
+                          labelText: 'University email',
+                        ),
+                        validator: (value) =>
+                            _required(value, 'University email'),
                       ),
                       const SizedBox(height: 14),
                     ],
                     TextFormField(
                       controller: _enrollment,
-                      decoration: const InputDecoration(labelText: 'Enrollment number'),
-                      validator: (value) => _required(value, 'Enrollment number'),
+                      decoration: const InputDecoration(
+                        labelText: 'Enrollment number',
+                      ),
+                      validator: (value) =>
+                          _required(value, 'Enrollment number'),
                     ),
                     const SizedBox(height: 14),
                     TextFormField(
@@ -158,21 +216,45 @@ class _AuthPageState extends State<AuthPage> {
                           ? 'Password must contain at least 8 characters'
                           : null,
                     ),
+                    if (_registering) ...[
+                      const SizedBox(height: 14),
+                      TextFormField(
+                        controller: _confirmPassword,
+                        obscureText: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Confirm password',
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Confirm password is required';
+                          }
+                          return value == _password.text
+                              ? null
+                              : 'Passwords do not match';
+                        },
+                      ),
+                    ],
                     const SizedBox(height: 24),
                     FilledButton(
                       onPressed: _loading ? null : _submit,
-                      child: Text(_loading ? 'Please wait…' : (_registering ? 'Register' : 'Sign in')),
+                      child: Text(
+                        _loading
+                            ? 'Please wait…'
+                            : (_registering ? 'Register' : 'Sign in'),
+                      ),
                     ),
                     TextButton(
                       onPressed: _loading
                           ? null
                           : () => setState(() {
-                                _registering = !_registering;
-                                _message = null;
-                              }),
-                      child: Text(_registering
-                          ? 'Already registered? Sign in'
-                          : 'New student? Create an account'),
+                              _registering = !_registering;
+                              _message = null;
+                            }),
+                      child: Text(
+                        _registering
+                            ? 'Already registered? Sign in'
+                            : 'New student? Create an account',
+                      ),
                     ),
                     if (_message != null) ...[
                       const SizedBox(height: 10),

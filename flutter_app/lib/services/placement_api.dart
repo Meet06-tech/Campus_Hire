@@ -39,12 +39,14 @@ class PlacementApi {
     required String enrollmentNumber,
     required String universityEmail,
     required String password,
+    required String confirmPassword,
   }) {
     return _post('/auth/register', {
       'fullName': fullName,
       'enrollmentNumber': enrollmentNumber,
       'universityEmail': universityEmail,
       'password': password,
+      'confirmPassword': confirmPassword,
     });
   }
 
@@ -120,8 +122,9 @@ class PlacementApi {
 
   Future<List<PlacementDrive>> fetchStudentDrives() async {
     final response = await _requestJson('GET', '/placement/student/drives');
-    if (response is! List)
+    if (response is! List) {
       throw const ApiException('Invalid drives response', 200);
+    }
     return response
         .map(
           (item) =>
@@ -135,8 +138,9 @@ class PlacementApi {
       'POST',
       '/placement/student/drives/$driveId/applications',
     );
-    if (response is! Map)
+    if (response is! Map) {
       throw const ApiException('Invalid application response', 200);
+    }
     return PlacementApplication.fromJson(Map<String, dynamic>.from(response));
   }
 
@@ -145,8 +149,9 @@ class PlacementApi {
       'GET',
       '/placement/student/applications',
     );
-    if (response is! List)
+    if (response is! List) {
       throw const ApiException('Invalid applications response', 200);
+    }
     return response
         .map(
           (item) => PlacementApplication.fromJson(
@@ -171,6 +176,35 @@ class PlacementApi {
           ),
         )
         .toList(growable: false);
+  }
+
+  Future<List<StudentApplicationProgress>> fetchMyApplicationHistory() async {
+    final response = await _requestJson(
+      'GET',
+      '/placement/student/applications/history',
+    );
+    if (response is! List) {
+      throw const ApiException('Invalid application history response', 200);
+    }
+    return response
+        .map(
+          (item) => StudentApplicationProgress.fromJson(
+            Map<String, dynamic>.from(item as Map),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  Future<PlacementApplication> decideOffer(int applicationId, String decision) async {
+    final response = await _requestJson(
+      'PUT',
+      '/placement/student/applications/$applicationId/offer',
+      body: {'decision': decision},
+    );
+    if (response is! Map) {
+      throw const ApiException('Invalid offer decision response', 200);
+    }
+    return PlacementApplication.fromJson(Map<String, dynamic>.from(response));
   }
 
   Future<Map<String, dynamic>> _post(String path, Map<String, dynamic> body) {
@@ -208,10 +242,27 @@ class PlacementApi {
     if (response.statusCode < 200 || response.statusCode >= 300) {
       final data = decoded is Map ? Map<String, dynamic>.from(decoded) : {};
       throw ApiException(
-        (data['detail'] ?? data['message'] ?? 'Request failed').toString(),
+        (data['detail'] ?? data['message'] ?? _fallbackMessage(response.statusCode)).toString(),
         response.statusCode,
       );
     }
     return decoded;
+  }
+
+  String _fallbackMessage(int statusCode) {
+    switch (statusCode) {
+      case 401:
+        return 'Your session has expired. Please sign in again.';
+      case 403:
+        return 'You are not allowed to perform this action.';
+      case 404:
+        return 'The requested record was not found.';
+      case 409:
+        return 'This action conflicts with an existing record.';
+      case 400:
+        return 'Please check the information and try again.';
+      default:
+        return statusCode >= 500 ? 'The server is temporarily unavailable.' : 'Request could not be completed.';
+    }
   }
 }

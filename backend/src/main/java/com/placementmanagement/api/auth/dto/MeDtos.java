@@ -2,6 +2,7 @@ package com.placementmanagement.api.auth.dto;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 public final class MeDtos {
     private MeDtos() {}
@@ -25,7 +26,9 @@ public final class MeDtos {
             String academicProgram,
             Short currentSemester,
             BigDecimal cgpa,
-            String careerProfile) {}
+            String careerProfile,
+            List<String> skills,
+            Integer programDurationSemesters) {}
 
     public record ProfileUpdateRequest(
             String fullName,
@@ -36,7 +39,15 @@ public final class MeDtos {
             String academicProgram,
             Integer currentSemester,
             BigDecimal cgpa,
-            String careerProfile) {}
+            String careerProfile,
+            List<String> skills) {
+        public ProfileUpdateRequest(String fullName, Integer admissionYear, Integer graduationYear,
+                LocalDate dateOfBirth, String phoneNumber, String academicProgram,
+                Integer currentSemester, BigDecimal cgpa, String careerProfile) {
+            this(fullName, admissionYear, graduationYear, dateOfBirth, phoneNumber, academicProgram,
+                    currentSemester, cgpa, careerProfile, null);
+        }
+    }
 
     public record DepartmentResponse(Long id, String code, String name) {}
 }

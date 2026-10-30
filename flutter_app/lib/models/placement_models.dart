@@ -96,6 +96,8 @@ class PlacementApplication {
     required this.studentId,
     required this.appliedAt,
     required this.status,
+    this.offerStatus,
+    this.offerDecidedAt,
   });
 
   final int id;
@@ -103,6 +105,8 @@ class PlacementApplication {
   final int studentId;
   final DateTime appliedAt;
   final String status;
+  final String? offerStatus;
+  final DateTime? offerDecidedAt;
 
   factory PlacementApplication.fromJson(Map<String, dynamic> json) {
     return PlacementApplication(
@@ -111,6 +115,8 @@ class PlacementApplication {
       studentId: (json['studentId'] as num).toInt(),
       appliedAt: DateTime.parse((json['appliedAt'] ?? '').toString()),
       status: (json['status'] ?? '').toString(),
+      offerStatus: json['offerStatus']?.toString(),
+      offerDecidedAt: _parseDate(json['offerDecidedAt']),
     );
   }
 }
@@ -150,6 +156,8 @@ class StudentApplicationProgress {
     required this.appliedAt,
     required this.applicationStatus,
     required this.finalOutcome,
+    required this.offerStatus,
+    required this.offerDecidedAt,
     required this.rounds,
   });
 
@@ -160,6 +168,8 @@ class StudentApplicationProgress {
   final DateTime appliedAt;
   final String applicationStatus;
   final String? finalOutcome;
+  final String? offerStatus;
+  final DateTime? offerDecidedAt;
   final List<StudentRoundProgress> rounds;
 
   factory StudentApplicationProgress.fromJson(Map<String, dynamic> json) {
@@ -172,6 +182,8 @@ class StudentApplicationProgress {
       appliedAt: DateTime.parse((json['appliedAt'] ?? '').toString()),
       applicationStatus: (json['applicationStatus'] ?? '').toString(),
       finalOutcome: json['finalOutcome']?.toString(),
+      offerStatus: json['offerStatus']?.toString(),
+      offerDecidedAt: _parseDate(json['offerDecidedAt']),
       rounds: rawRounds is List
           ? rawRounds
                 .map(

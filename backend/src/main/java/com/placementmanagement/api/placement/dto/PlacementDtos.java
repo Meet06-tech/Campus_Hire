@@ -16,7 +16,12 @@ public final class PlacementDtos {
     public record DriveResponse(Long id, CompanyResponse company, Long departmentId, String title, String jobDescription,
             String jobType, String location, String packageSalary, Instant applicationDeadline, DriveStatus status,
             BigDecimal minimumCgpa, Short graduationYear, Integer maximumActiveBacklogs, List<String> eligibleProgramCodes) {}
-    public record ApplicationResponse(Long id, Long driveId, Long studentId, Instant appliedAt, ApplicationStatus status) {}
+    public record ApplicationResponse(Long id, Long driveId, Long studentId, Instant appliedAt, ApplicationStatus status,
+            OfferStatus offerStatus, Instant offerDecidedAt) {
+        public ApplicationResponse(Long id, Long driveId, Long studentId, Instant appliedAt, ApplicationStatus status) {
+            this(id, driveId, studentId, appliedAt, status, null, null);
+        }
+    }
     public record StaffApplicationResponse(Long id, Long studentId, String studentName, String universityEmail,
             String enrollmentNumber, Long departmentId, String departmentCode, String departmentName,
             String academicProgram, Long driveId, String driveTitle, String companyName,
@@ -42,13 +47,15 @@ public final class PlacementDtos {
             ApplicationStatus applicationStatus) {}
     public record RoundResultRequest(RoundResultStatus result) {}
     public record FinalOutcomeRequest(ApplicationStatus outcome) {}
+    public record OfferDecisionRequest(OfferStatus decision) {}
     public record RoundResultResponse(Long roundId, Long applicationId, RoundResultStatus result,
             Instant recordedAt) {}
     public record StudentRoundProgress(Long roundId, Integer order, String name,
             boolean resultsPublished, String status) {}
     public record StudentApplicationProgress(Long applicationId, Long driveId, String companyName,
             String driveTitle, Instant appliedAt, ApplicationStatus applicationStatus,
-            String finalOutcome, List<StudentRoundProgress> rounds) {}
+            String finalOutcome, OfferStatus offerStatus, Instant offerDecidedAt,
+            List<StudentRoundProgress> rounds) {}
 
     public interface StaffApplicationProjection {
         Long getApplicationId();

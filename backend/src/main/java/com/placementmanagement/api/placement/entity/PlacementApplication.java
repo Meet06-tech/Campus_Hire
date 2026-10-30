@@ -13,6 +13,8 @@ public class PlacementApplication {
     @ManyToOne(optional = false) @JoinColumn(name = "student_id") private Student student;
     @Column(name = "applied_at", nullable = false, updatable = false) private Instant appliedAt = Instant.now();
     @Enumerated(EnumType.STRING) @Column(nullable = false) private ApplicationStatus status = ApplicationStatus.APPLIED;
+    @Enumerated(EnumType.STRING) @Column(name = "offer_status") private OfferStatus offerStatus;
+    @Column(name = "offer_decided_at") private Instant offerDecidedAt;
     protected PlacementApplication() {}
     public PlacementApplication(PlacementDrive drive, Student student) { this.drive = drive; this.student = student; }
     public Long getId() { return id; }
@@ -21,4 +23,7 @@ public class PlacementApplication {
     public Instant getAppliedAt() { return appliedAt; }
     public ApplicationStatus getStatus() { return status; }
     public void setStatus(ApplicationStatus status) { this.status = status; }
+    public OfferStatus getOfferStatus() { return offerStatus; }
+    public Instant getOfferDecidedAt() { return offerDecidedAt; }
+    public void decideOffer(OfferStatus decision) { this.offerStatus = decision; this.offerDecidedAt = Instant.now(); }
 }

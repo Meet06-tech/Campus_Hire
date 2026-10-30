@@ -51,5 +51,8 @@ class _FakePlacementApi extends PlacementApi {
   Future<List<StudentApplicationProgress>> fetchMyApplicationProgress() async => const [];
 
   @override
+  Future<List<StudentApplicationProgress>> fetchMyApplicationHistory() async => const [];
+
+  @override
   Future<Uint8List?> fetchProfilePhoto() async => null;
 }

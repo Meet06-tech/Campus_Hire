@@ -29,12 +29,16 @@ import com.placementmanagement.api.auth.entity.UserRole;
 import com.placementmanagement.api.auth.repository.StudentRepository;
 import com.placementmanagement.api.auth.repository.UserAccountRepository;
 import com.placementmanagement.api.auth.service.CurrentUserService;
+import com.placementmanagement.api.placement.entity.PlacementProgram;
+import com.placementmanagement.api.placement.repository.PlacementProgramRepository;
 
 class CurrentUserServiceTest {
     @Mock
     private UserAccountRepository users;
     @Mock
     private StudentRepository students;
+    @Mock
+    private PlacementProgramRepository programs;
     @Mock
     private UserAccount user;
     @Mock
@@ -93,7 +97,7 @@ class CurrentUserServiceTest {
         verify(user).updateFullName("Updated Student");
         verify(student).updateProfile(
                 (short) 2025, (short) 2029, LocalDate.of(2005, 2, 3), "9876543210", "MCA", (short) 2,
-                new BigDecimal("9.10"), "Open to software roles");
+                new BigDecimal("9.10"), "Open to software roles", null);
         verify(users).save(user);
         verify(students).save(student);
     }
@@ -123,5 +127,39 @@ class CurrentUserServiceTest {
         assertEquals(403, exception.getStatusCode().value());
         verify(users, never()).save(any());
         verify(students, never()).save(any());
+    }
+
+    @Test
+    void rejectsSemesterOutsideConfiguredProgramDuration() {
+        PlacementProgram program = org.mockito.Mockito.mock(PlacementProgram.class);
+        when(programs.findByCodeIgnoreCase("MCA")).thenReturn(Optional.of(program));
+        when(program.getDurationSemesters()).thenReturn((short) 4);
+        when(student.getAcademicProgram()).thenReturn("MCA");
+        CurrentUserService durationAwareService = new CurrentUserService(users, students, programs);
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> durationAwareService.updateCurrentUser(authentication,
+                        new ProfileUpdateRequest(null, null, null, null, null, "MCA", 5, null, null)));
+
+        assertEquals(400, exception.getStatusCode().value());
+        assertEquals("Semester must be within your program duration", exception.getReason());
+        verify(students, never()).save(any());
+    }
+
+    @Test
+    void updatesSkillsAndOtherFieldsWhenExistingSemesterIsUnchangedAndDurationIsNotConfigured() {
+        when(programs.findByCodeIgnoreCase("MCA")).thenReturn(Optional.empty());
+        when(student.getAcademicProgram()).thenReturn("MCA");
+        when(student.getCurrentSemester()).thenReturn((short) 2);
+        CurrentUserService durationAwareService = new CurrentUserService(users, students, programs);
+
+        durationAwareService.updateCurrentUser(authentication,
+                new ProfileUpdateRequest("Updated Student", null, null, null, null,
+                        "MCA", 2, null, null, java.util.List.of("Java", "Custom Skill")));
+
+        verify(student).updateProfile(
+                (short) 2025, (short) 2029, null, null, "MCA", (short) 2, new BigDecimal("8.50"), null,
+                new java.util.LinkedHashSet<>(java.util.List.of("Java", "Custom Skill")));
+        verify(students).save(student);
     }
 }

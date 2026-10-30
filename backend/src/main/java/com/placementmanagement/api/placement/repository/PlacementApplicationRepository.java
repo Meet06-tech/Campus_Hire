@@ -7,9 +7,11 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import com.placementmanagement.api.placement.entity.PlacementApplication;
 import com.placementmanagement.api.placement.entity.ApplicationStatus;
+import com.placementmanagement.api.placement.entity.OfferStatus;
 import com.placementmanagement.api.placement.dto.PlacementDtos.StaffApplicationProjection;
 public interface PlacementApplicationRepository extends JpaRepository<PlacementApplication, Long> {
     boolean existsByDrive_IdAndStudent_Id(Long driveId, Long studentId);
+    boolean existsByStudent_IdAndOfferStatus(Long studentId, OfferStatus offerStatus);
     List<PlacementApplication> findAllByStudent_IdOrderByAppliedAtDesc(Long studentId);
     List<PlacementApplication> findAllByDrive_IdOrderByAppliedAtAsc(Long driveId);
     long countByStatus(ApplicationStatus status);

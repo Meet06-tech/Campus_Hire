@@ -208,6 +208,24 @@ class _ProfilePageState extends State<ProfilePage> {
                           ),
                           const SizedBox(height: 16),
                           _Section(
+                            title: 'Skills',
+                            children: [
+                              ...(_profile!.profile['skills'] is List
+                                      ? (_profile!.profile['skills'] as List)
+                                          .map((skill) => skill.toString())
+                                          .toList()
+                                      : <String>[])
+                                  .map((skill) => Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: 4),
+                                        child: Text('• $skill'),
+                                      )),
+                              if (_profile!.profile['skills'] is! List ||
+                                  (_profile!.profile['skills'] as List).isEmpty)
+                                const Text('No skills added yet.'),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          _Section(
                             title: 'Contact and career',
                             children: [
                               _InfoRow(label: 'Phone number', value: _value(_profile!.profile['phoneNumber'])),
@@ -251,7 +269,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
   late final TextEditingController _semester;
   late final TextEditingController _cgpa;
   late final TextEditingController _career;
+  late final TextEditingController _customSkill;
+  final Set<String> _skills = {};
   bool _saving = false;
+
+  static const _predefinedSkills = [
+    'Java', 'Python', 'SQL', 'Spring Framework', 'AI/ML', 'Django',
+    'Flutter', 'Angular', 'JavaScript', 'PostgreSQL',
+  ];
 
   @override
   void initState() {
@@ -266,13 +291,18 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _semester = TextEditingController(text: _text(p['currentSemester']));
     _cgpa = TextEditingController(text: _text(p['cgpa']));
     _career = TextEditingController(text: _text(p['careerProfile']));
+    _customSkill = TextEditingController();
+    final rawSkills = p['skills'];
+    if (rawSkills is List) {
+      _skills.addAll(rawSkills.map((value) => value.toString().trim()).where((value) => value.isNotEmpty));
+    }
   }
 
   String _text(dynamic value) => value?.toString() ?? '';
 
   @override
   void dispose() {
-    for (final controller in [_name, _phone, _program, _admissionYear, _graduationYear, _dob, _semester, _cgpa, _career]) {
+    for (final controller in [_name, _phone, _program, _admissionYear, _graduationYear, _dob, _semester, _cgpa, _career, _customSkill]) {
       controller.dispose();
     }
     super.dispose();
@@ -292,6 +322,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         'currentSemester': _number(_semester.text),
         'cgpa': _decimal(_cgpa.text),
         'careerProfile': _nullable(_career.text),
+        'skills': _skills.toList(),
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile updated')));
@@ -313,6 +344,31 @@ class _EditProfilePageState extends State<EditProfilePage> {
   String? _numberValidator(String? value) {
     if (value == null || value.trim().isEmpty) return null;
     return int.tryParse(value.trim()) == null ? 'Enter a whole number' : null;
+  }
+
+  String? _semesterValidator(String? value) {
+    final basic = _numberValidator(value);
+    if (basic != null || value == null || value.trim().isEmpty) return basic;
+    final semester = int.parse(value.trim());
+    if (semester <= 0) return 'Semester must be positive';
+    final duration = widget.profile.profile['programDurationSemesters'];
+    if (duration is num && semester > duration) {
+      return 'Semester must be within your program duration of ${duration.toInt()} semesters';
+    }
+    return null;
+  }
+
+  void _addCustomSkill() {
+    final skill = _customSkill.text.trim();
+    if (skill.isEmpty) return;
+    if (skill.length > 100) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Skill names must be 100 characters or fewer.')));
+      return;
+    }
+    setState(() {
+      _skills.add(skill);
+      _customSkill.clear();
+    });
   }
 
   @override
@@ -338,7 +394,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
             const SizedBox(height: 14),
             _numberField(_graduationYear, 'Graduation year'),
             const SizedBox(height: 14),
-            _numberField(_semester, 'Current semester'),
+            _numberField(_semester, 'Current semester', validator: _semesterValidator),
             const SizedBox(height: 14),
             TextFormField(controller: _program, decoration: const InputDecoration(labelText: 'Academic program')),
             const SizedBox(height: 14),
@@ -347,6 +403,38 @@ class _EditProfilePageState extends State<EditProfilePage> {
               final number = double.tryParse(value.trim());
               return number == null || number < 0 || number > 10 ? 'Enter a CGPA between 0 and 10' : null;
             }),
+            const SizedBox(height: 14),
+            Text('Skills', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: _predefinedSkills.map((skill) => FilterChip(
+                label: Text(skill),
+                selected: _skills.contains(skill),
+                onSelected: (selected) => setState(() => selected ? _skills.add(skill) : _skills.remove(skill)),
+              )).toList(),
+            ),
+            if (_skills.any((skill) => !_predefinedSkills.contains(skill))) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: _skills
+                    .where((skill) => !_predefinedSkills.contains(skill))
+                    .map((skill) => InputChip(
+                      label: Text(skill),
+                      onDeleted: () => setState(() => _skills.remove(skill)),
+                    ))
+                    .toList(),
+              ),
+            ],
+            const SizedBox(height: 10),
+            Row(children: [
+              Expanded(child: TextField(controller: _customSkill, decoration: const InputDecoration(labelText: 'Add custom skill'))),
+              const SizedBox(width: 8),
+              IconButton(onPressed: _addCustomSkill, icon: const Icon(Icons.add_circle_outline), tooltip: 'Add skill'),
+            ]),
             const Divider(height: 32),
             Text('Contact and career', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 12),
@@ -364,8 +452,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
     );
   }
 
-  Widget _numberField(TextEditingController controller, String label) {
-    return TextFormField(controller: controller, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: label), validator: _numberValidator);
+  Widget _numberField(TextEditingController controller, String label, {String? Function(String?)? validator}) {
+    return TextFormField(controller: controller, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: label), validator: validator ?? _numberValidator);
   }
 }
 

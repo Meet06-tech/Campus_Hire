@@ -74,6 +74,10 @@ public class PlacementController {
     public List<StudentApplicationProgress> studentProgress(Authentication auth) {
         return recruitment.studentProgress(auth);
     }
+    @GetMapping("/student/applications/history")
+    public List<StudentApplicationProgress> studentHistory(Authentication auth) {
+        return recruitment.studentHistory(auth);
+    }
 
     @PostMapping("/companies") @ResponseStatus(HttpStatus.CREATED)
     public CompanyResponse createCompany(@RequestBody CompanyRequest request, Authentication auth) { return service.createCompany(auth, request); }
@@ -93,6 +97,11 @@ public class PlacementController {
     public ApplicationResponse apply(@PathVariable Long driveId, Authentication auth) { return service.apply(auth, driveId); }
     @GetMapping("/student/applications")
     public List<ApplicationResponse> applications(Authentication auth) { return service.myApplications(auth); }
+    @PutMapping("/student/applications/{applicationId}/offer")
+    public ApplicationResponse decideOffer(@PathVariable Long applicationId,
+            @RequestBody OfferDecisionRequest request, Authentication auth) {
+        return service.decideOffer(auth, applicationId, request);
+    }
     @GetMapping("/applications")
     public StaffApplicationPageResponse staffApplications(@RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "25") int size, @RequestParam(required = false) String search,

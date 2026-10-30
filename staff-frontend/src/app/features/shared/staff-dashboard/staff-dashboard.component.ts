@@ -228,13 +228,18 @@ export class StaffDashboardComponent implements OnInit {
         this.showCompanyForm.set(false);
         this.finishSave('Company created successfully.');
       },
-      error: () => this.failSave('Company could not be created. Check the details and try again.')
+      error: error => this.failSave(this.apiError(error, 'Company could not be created. Check the details and try again.'))
     });
   }
 
   submitDrive(): void {
     if (!this.driveForm.companyId || !this.driveForm.title.trim() || !this.driveForm.applicationDeadline || !this.driveForm.jobDescription.trim() || !this.driveForm.location.trim() || !this.driveForm.packageSalary.trim()) {
       this.errorMessage.set('Complete the required drive fields before saving.');
+      return;
+    }
+    const deadline = new Date(`${this.driveForm.applicationDeadline}T23:59:59`);
+    if (Number.isNaN(deadline.getTime()) || deadline.getTime() < Date.now()) {
+      this.errorMessage.set('Application deadline must be today or a future date.');
       return;
     }
     this.startSave();
@@ -246,7 +251,7 @@ export class StaffDashboardComponent implements OnInit {
         this.showDriveForm.set(false);
         this.finishSave('Placement drive created as a draft.');
       },
-      error: () => this.failSave('Placement drive could not be created. Confirm the active academic year and required fields.')
+      error: error => this.failSave(this.apiError(error, 'Placement drive could not be created. Confirm the active academic year and required fields.'))
     });
   }
 
@@ -257,7 +262,7 @@ export class StaffDashboardComponent implements OnInit {
         this.drives.update(items => items.map(item => item.id === published.id ? published : item));
         this.finishSave('Placement drive published successfully.');
       },
-      error: () => this.failSave('This drive could not be published. It may no longer be a draft or may fail backend validation.')
+      error: error => this.failSave(this.apiError(error, 'This drive could not be published. It may no longer be a draft or may fail backend validation.'))
     });
   }
 
@@ -269,7 +274,7 @@ export class StaffDashboardComponent implements OnInit {
         this.drives.update(items => items.map(item => item.id === cancelled.id ? cancelled : item));
         this.finishSave('Placement drive cancelled. Existing application history was preserved.');
       },
-      error: () => this.failSave('This drive could not be cancelled. Only draft or published drives can be cancelled.')
+      error: error => this.failSave(this.apiError(error, 'This drive could not be cancelled. Only draft or published drives can be cancelled.'))
     });
   }
 
@@ -279,13 +284,13 @@ export class StaffDashboardComponent implements OnInit {
     this.candidates.set([]);
     this.selectedRound.set(null);
     this.nav('rounds');
-    this.placementService.listRounds(drive.id).subscribe({ next: rounds => { this.rounds.set(rounds); if (rounds[0]) this.selectRound(rounds[0]); }, error: () => this.errorMessage.set('Could not load drive rounds.') });
+    this.placementService.listRounds(drive.id).subscribe({ next: rounds => { this.rounds.set(rounds); if (rounds[0]) this.selectRound(rounds[0]); }, error: error => this.errorMessage.set(this.apiError(error, 'Could not load drive rounds.')) });
   }
   selectRound(round: RecruitmentRound): void {
     const drive = this.selectedDrive();
     if (!drive) return;
     this.selectedRound.set(round);
-    this.placementService.listRoundCandidates(drive.id, round.id).subscribe({ next: candidates => this.candidates.set(candidates), error: () => this.errorMessage.set('Could not load round candidates.') });
+    this.placementService.listRoundCandidates(drive.id, round.id).subscribe({ next: candidates => this.candidates.set(candidates), error: error => this.errorMessage.set(this.apiError(error, 'Could not load round candidates.')) });
   }
   submitRound(): void {
     const drive = this.selectedDrive();
@@ -293,25 +298,25 @@ export class StaffDashboardComponent implements OnInit {
     this.startSave();
     this.placementService.createRound(drive.id, { ...this.roundForm, name: this.roundForm.name.trim() }).subscribe({
       next: round => { this.rounds.update(items => [...items, round].sort((a, b) => a.order - b.order)); this.roundForm = { name: '', order: this.rounds().length + 1, finalRound: false }; this.finishSave('Round added successfully.'); },
-      error: () => this.failSave('Round could not be added. Structural edits are blocked after results exist.')
+      error: error => this.failSave(this.apiError(error, 'Round could not be added. Structural edits are blocked after results exist.'))
     });
   }
   removeRound(round: RecruitmentRound): void {
     const drive = this.selectedDrive();
     if (!drive || !confirm(`Remove ${round.name}?`)) return;
     this.startSave();
-    this.placementService.deleteRound(drive.id, round.id).subscribe({ next: () => { this.rounds.update(items => items.filter(item => item.id !== round.id)); this.finishSave('Round removed.'); }, error: () => this.failSave('This round cannot be removed after results have been recorded.') });
+    this.placementService.deleteRound(drive.id, round.id).subscribe({ next: () => { this.rounds.update(items => items.filter(item => item.id !== round.id)); this.finishSave('Round removed.'); }, error: error => this.failSave(this.apiError(error, 'This round cannot be removed after results have been recorded.')) });
   }
   saveResult(candidate: RoundCandidate, result: 'PASSED' | 'FAILED'): void {
     const drive = this.selectedDrive(); const round = this.selectedRound();
     if (!drive || !round) return;
-    this.placementService.saveRoundResult(drive.id, round.id, candidate.applicationId, result).subscribe({ next: () => { this.candidates.update(items => items.map(item => item.applicationId === candidate.applicationId ? { ...item, result } : item)); this.successMessage.set('Result saved.'); }, error: () => this.errorMessage.set('Result could not be saved.') });
+    this.placementService.saveRoundResult(drive.id, round.id, candidate.applicationId, result).subscribe({ next: () => { this.candidates.update(items => items.map(item => item.applicationId === candidate.applicationId ? { ...item, result } : item)); this.successMessage.set('Result saved.'); }, error: error => this.errorMessage.set(this.apiError(error, 'Result could not be saved.')) });
   }
   publishRoundResults(): void {
     const drive = this.selectedDrive(); const round = this.selectedRound();
     if (!drive || !round) return;
     this.startSave();
-    this.placementService.publishRound(drive.id, round.id).subscribe({ next: updated => { this.rounds.update(items => items.map(item => item.id === updated.id ? updated : item)); this.selectedRound.set(updated); this.finishSave('Round results published.'); }, error: () => this.failSave('Round results could not be published.') });
+    this.placementService.publishRound(drive.id, round.id).subscribe({ next: updated => { this.rounds.update(items => items.map(item => item.id === updated.id ? updated : item)); this.selectedRound.set(updated); this.finishSave('Round results published.'); }, error: error => this.failSave(this.apiError(error, 'Round results could not be published.')) });
   }
   setFinalOutcome(candidate: RoundCandidate, outcome: 'SELECTED' | 'REJECTED'): void {
     const drive = this.selectedDrive();
@@ -372,14 +377,23 @@ export class StaffDashboardComponent implements OnInit {
         this.showCoordinatorForm.set(false);
         this.finishSave('Department coordinator created successfully.');
       },
-      error: () => this.failSave('Coordinator could not be created. Check the email, department, and password.')
+      error: error => this.failSave(this.apiError(error, 'Coordinator could not be created. Check the email, department, and password.'))
     });
   }
 
   private startSave(): void { this.saving.set(true); this.errorMessage.set(null); this.successMessage.set(null); }
   private finishSave(message: string): void { this.saving.set(false); this.successMessage.set(message); }
   private failSave(message: string): void { this.saving.set(false); this.errorMessage.set(message); }
+  minimumDeadline(): string {
+    const today = new Date();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${today.getFullYear()}-${month}-${day}`;
+  }
   private toInstant(date: string): string { return new Date(`${date}T23:59:59`).toISOString(); }
+  private apiError(error: { error?: { detail?: string; message?: string }; message?: string }, fallback: string): string {
+    return error.error?.detail ?? error.error?.message ?? error.message ?? fallback;
+  }
   private emptyCompany(): CompanyRequest { return { name: '', description: '', website: '', hrContactName: '', hrContactEmail: '', hrContactPhone: '' }; }
   private emptyDrive(): DriveRequest { return { companyId: 0, departmentId: null, title: '', jobDescription: '', jobType: 'ONSITE', location: '', packageSalary: '', applicationDeadline: '', minimumCgpa: null, graduationYear: null, maximumActiveBacklogs: null, eligibleProgramIds: [] }; }
   private emptyCoordinator(): CoordinatorRequest { return { fullName: '', universityEmail: '', departmentId: null, initialPassword: '' }; }

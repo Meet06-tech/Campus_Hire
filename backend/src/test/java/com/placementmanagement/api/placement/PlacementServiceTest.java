@@ -33,6 +33,7 @@ import com.placementmanagement.api.placement.dto.PlacementDtos.StaffStudentPageR
 import com.placementmanagement.api.placement.dto.PlacementDtos.CompanyRequest;
 import com.placementmanagement.api.placement.dto.PlacementDtos.DriveRequest;
 import com.placementmanagement.api.placement.dto.PlacementDtos.DriveResponse;
+import com.placementmanagement.api.placement.dto.PlacementDtos.OfferDecisionRequest;
 import com.placementmanagement.api.placement.entity.AcademicYear;
 import com.placementmanagement.api.placement.entity.ApplicationStatus;
 import com.placementmanagement.api.placement.entity.Company;
@@ -40,6 +41,7 @@ import com.placementmanagement.api.placement.entity.DriveStatus;
 import com.placementmanagement.api.placement.entity.PlacementApplication;
 import com.placementmanagement.api.placement.entity.PlacementDrive;
 import com.placementmanagement.api.placement.entity.PlacementProgram;
+import com.placementmanagement.api.placement.entity.OfferStatus;
 import com.placementmanagement.api.placement.repository.AcademicYearRepository;
 import com.placementmanagement.api.placement.repository.CompanyRepository;
 import com.placementmanagement.api.placement.repository.PlacementApplicationRepository;
@@ -119,6 +121,21 @@ class PlacementServiceTest {
 
         assertEquals(403, error.getStatusCode().value());
         verify(drives, never()).save(any());
+    }
+
+    @Test
+    void rejectsDriveWithPastApplicationDeadline() {
+        UserAccount utpo = mock(UserAccount.class);
+        when(authorization.staff(authentication)).thenReturn(utpo);
+
+        ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                () -> service.createDrive(authentication, new DriveRequest(5L, null, "Backend Engineer",
+                        "Build APIs", "REMOTE", "Remote", "8 LPA", Instant.now().minusSeconds(60),
+                        null, null, null, List.of())));
+
+        assertEquals(400, error.getStatusCode().value());
+        assertEquals("Application deadline must be in the future", error.getReason());
+        verifyNoInteractions(companies, academicYears, drives);
     }
 
     @Test
@@ -300,7 +317,7 @@ class PlacementServiceTest {
                 () -> service.apply(authentication, 9L));
 
         assertEquals(400, error.getStatusCode().value());
-        verifyNoInteractions(applications);
+        verify(applications, never()).save(any());
     }
 
     @Test
@@ -315,7 +332,63 @@ class PlacementServiceTest {
                 () -> service.apply(authentication, 9L));
 
         assertEquals(400, error.getStatusCode().value());
-        verifyNoInteractions(applications);
+        verify(applications, never()).save(any());
+    }
+
+    @Test
+    void studentWithAcceptedOfferCannotApplyToAnotherDrive() {
+        Student student = mock(Student.class);
+        when(authorization.student(authentication)).thenReturn(student);
+        when(student.getId()).thenReturn(20L);
+        when(applications.existsByStudent_IdAndOfferStatus(20L, OfferStatus.ACCEPTED)).thenReturn(true);
+
+        ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                () -> service.apply(authentication, 9L));
+
+        assertEquals(400, error.getStatusCode().value());
+        assertEquals("You have already accepted a placement offer. You cannot apply for another drive.", error.getReason());
+        verifyNoInteractions(drives);
+    }
+
+    @Test
+    void selectedStudentCanDecideOfferOnlyOnce() {
+        Student student = mock(Student.class);
+        PlacementApplication application = mock(PlacementApplication.class);
+        PlacementDrive selectedDrive = mock(PlacementDrive.class);
+        when(authorization.student(authentication)).thenReturn(student);
+        when(student.getId()).thenReturn(20L);
+        when(application.getStudent()).thenReturn(student);
+        when(application.getStatus()).thenReturn(ApplicationStatus.SELECTED);
+        when(application.getOfferStatus()).thenReturn(null);
+        when(application.getDrive()).thenReturn(selectedDrive);
+        when(selectedDrive.getId()).thenReturn(9L);
+        when(application.getId()).thenReturn(30L);
+        when(application.getAppliedAt()).thenReturn(Instant.now());
+        when(applications.findById(30L)).thenReturn(Optional.of(application));
+        when(applications.save(application)).thenReturn(application);
+
+        service.decideOffer(authentication, 30L, new OfferDecisionRequest(OfferStatus.ACCEPTED));
+
+        verify(application).decideOffer(OfferStatus.ACCEPTED);
+        verify(applications).save(application);
+    }
+
+    @Test
+    void repeatedOfferDecisionIsRejected() {
+        Student student = mock(Student.class);
+        PlacementApplication application = mock(PlacementApplication.class);
+        when(authorization.student(authentication)).thenReturn(student);
+        when(student.getId()).thenReturn(20L);
+        when(application.getStudent()).thenReturn(student);
+        when(application.getStatus()).thenReturn(ApplicationStatus.SELECTED);
+        when(application.getOfferStatus()).thenReturn(OfferStatus.DECLINED);
+        when(applications.findById(30L)).thenReturn(Optional.of(application));
+
+        ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                () -> service.decideOffer(authentication, 30L, new OfferDecisionRequest(OfferStatus.ACCEPTED)));
+
+        assertEquals(409, error.getStatusCode().value());
+        verify(applications, never()).save(any());
     }
 
     @Test
@@ -336,7 +409,7 @@ class PlacementServiceTest {
                 () -> service.apply(authentication, 9L));
 
         assertEquals(403, error.getStatusCode().value());
-        verifyNoInteractions(applications);
+        verify(applications, never()).save(any());
     }
 
     @Test

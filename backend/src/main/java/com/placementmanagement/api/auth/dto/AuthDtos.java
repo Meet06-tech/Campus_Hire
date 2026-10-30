@@ -7,7 +7,12 @@ public final class AuthDtos {
             String fullName,
             String enrollmentNumber,
             String universityEmail,
-            String password) {}
+            String password,
+            String confirmPassword) {
+        public RegisterRequest(String fullName, String enrollmentNumber, String universityEmail, String password) {
+            this(fullName, enrollmentNumber, universityEmail, password, null);
+        }
+    }
 
     public record LoginRequest(String identifier, String enrollmentNumber, String password) {
         /** Backward-compatible constructor for existing student callers/tests. */
