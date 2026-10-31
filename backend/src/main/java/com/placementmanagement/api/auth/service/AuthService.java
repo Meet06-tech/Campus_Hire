@@ -53,6 +53,9 @@ public class AuthService {
         if (password.length() < 8) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password must be at least 8 characters");
         }
+        if (request.confirmPassword() != null && !password.equals(request.confirmPassword())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Passwords do not match");
+        }
         if (users.existsByStudentEnrollmentNumber(enrollment)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Enrollment number is already registered");
         }

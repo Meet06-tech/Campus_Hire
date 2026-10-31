@@ -33,6 +33,7 @@ import com.placementmanagement.api.placement.dto.PlacementDtos.StaffStudentPageR
 import com.placementmanagement.api.placement.dto.PlacementDtos.CompanyRequest;
 import com.placementmanagement.api.placement.dto.PlacementDtos.DriveRequest;
 import com.placementmanagement.api.placement.dto.PlacementDtos.DriveResponse;
+import com.placementmanagement.api.placement.dto.PlacementDtos.OfferDecisionRequest;
 import com.placementmanagement.api.placement.entity.AcademicYear;
 import com.placementmanagement.api.placement.entity.ApplicationStatus;
 import com.placementmanagement.api.placement.entity.Company;
@@ -40,6 +41,7 @@ import com.placementmanagement.api.placement.entity.DriveStatus;
 import com.placementmanagement.api.placement.entity.PlacementApplication;
 import com.placementmanagement.api.placement.entity.PlacementDrive;
 import com.placementmanagement.api.placement.entity.PlacementProgram;
+import com.placementmanagement.api.placement.entity.OfferStatus;
 import com.placementmanagement.api.placement.repository.AcademicYearRepository;
 import com.placementmanagement.api.placement.repository.CompanyRepository;
 import com.placementmanagement.api.placement.repository.PlacementApplicationRepository;
@@ -122,6 +124,21 @@ class PlacementServiceTest {
     }
 
     @Test
+    void rejectsDriveWithPastApplicationDeadline() {
+        UserAccount utpo = mock(UserAccount.class);
+        when(authorization.staff(authentication)).thenReturn(utpo);
+
+        ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                () -> service.createDrive(authentication, new DriveRequest(5L, null, "Backend Engineer",
+                        "Build APIs", "REMOTE", "Remote", "8 LPA", Instant.now().minusSeconds(60),
+                        null, null, null, List.of())));
+
+        assertEquals(400, error.getStatusCode().value());
+        assertEquals("Application deadline must be in the future", error.getReason());
+        verifyNoInteractions(companies, academicYears, drives);
+    }
+
+    @Test
     void dtpoListsOnlyAssignedDepartmentDrivesWhileUtpoListsAll() {
         UserAccount dtpo = mock(UserAccount.class);
         UserAccount utpo = mock(UserAccount.class);
@@ -194,6 +211,45 @@ class PlacementServiceTest {
     }
 
     @Test
+    void authorizedDtpoCanCancelOwnPublishedDrive() {
+        UserAccount dtpo = mock(UserAccount.class);
+        Department department = department(2L);
+        Company company = mock(Company.class);
+        PlacementDrive drive = mock(PlacementDrive.class);
+        when(authorization.staff(authentication)).thenReturn(dtpo);
+        when(dtpo.getRole()).thenReturn(UserRole.DTPO);
+        when(dtpo.getDepartment()).thenReturn(department);
+        when(drives.findById(9L)).thenReturn(Optional.of(drive));
+        when(drive.getCompany()).thenReturn(company);
+        when(drive.getDepartment()).thenReturn(department);
+        when(drive.getPrograms()).thenReturn(Set.of());
+        when(drive.getStatus()).thenReturn(DriveStatus.PUBLISHED);
+
+        service.cancelDrive(authentication, 9L);
+
+        verify(drive).setStatus(DriveStatus.CANCELLED);
+    }
+
+    @Test
+    void dtpoCannotCancelAnotherDepartmentsDrive() {
+        UserAccount dtpo = mock(UserAccount.class);
+        Department ownDepartment = department(2L);
+        Department otherDepartment = department(3L);
+        PlacementDrive drive = mock(PlacementDrive.class);
+        when(authorization.staff(authentication)).thenReturn(dtpo);
+        when(dtpo.getRole()).thenReturn(UserRole.DTPO);
+        when(dtpo.getDepartment()).thenReturn(ownDepartment);
+        when(drives.findById(9L)).thenReturn(Optional.of(drive));
+        when(drive.getDepartment()).thenReturn(otherDepartment);
+
+        ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                () -> service.cancelDrive(authentication, 9L));
+
+        assertEquals(403, error.getStatusCode().value());
+        verify(drive, never()).setStatus(any());
+    }
+
+    @Test
     void unauthenticatedPublishIsRejectedBeforeDriveLookup() {
         when(authorization.staff(authentication)).thenThrow(new ResponseStatusException(
                 org.springframework.http.HttpStatus.UNAUTHORIZED, "Authentication is required"));
@@ -210,14 +266,17 @@ class PlacementServiceTest {
         Student student = mock(Student.class);
         Department department = department(2L);
         PlacementDrive eligible = drive(DriveStatus.PUBLISHED, null, 7, 2029, "MCA");
+        PlacementDrive cancelled = mock(PlacementDrive.class);
         PlacementDrive ineligible = mock(PlacementDrive.class);
+        when(ineligible.getStatus()).thenReturn(DriveStatus.PUBLISHED);
         when(ineligible.getMinimumCgpa()).thenReturn(new java.math.BigDecimal("9"));
+        when(cancelled.getStatus()).thenReturn(DriveStatus.CANCELLED);
         when(authorization.student(authentication)).thenReturn(student);
         when(student.getDepartment()).thenReturn(department);
         when(student.getCgpa()).thenReturn(new java.math.BigDecimal("8.0"));
         when(student.getGraduationYear()).thenReturn((short) 2029);
         when(student.getAcademicProgram()).thenReturn("MCA");
-        when(drives.findVisiblePublished(DriveStatus.PUBLISHED, 2L)).thenReturn(List.of(eligible, ineligible));
+        when(drives.findVisiblePublished(DriveStatus.PUBLISHED, 2L)).thenReturn(List.of(eligible, cancelled, ineligible));
 
         List<DriveResponse> result = service.listStudentDrives(authentication);
 
@@ -258,7 +317,78 @@ class PlacementServiceTest {
                 () -> service.apply(authentication, 9L));
 
         assertEquals(400, error.getStatusCode().value());
-        verifyNoInteractions(applications);
+        verify(applications, never()).save(any());
+    }
+
+    @Test
+    void studentCannotApplyToCancelledDrive() {
+        Student student = mock(Student.class);
+        PlacementDrive drive = mock(PlacementDrive.class);
+        when(authorization.student(authentication)).thenReturn(student);
+        when(drives.findById(9L)).thenReturn(Optional.of(drive));
+        when(drive.getStatus()).thenReturn(DriveStatus.CANCELLED);
+
+        ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                () -> service.apply(authentication, 9L));
+
+        assertEquals(400, error.getStatusCode().value());
+        verify(applications, never()).save(any());
+    }
+
+    @Test
+    void studentWithAcceptedOfferCannotApplyToAnotherDrive() {
+        Student student = mock(Student.class);
+        when(authorization.student(authentication)).thenReturn(student);
+        when(student.getId()).thenReturn(20L);
+        when(applications.existsByStudent_IdAndOfferStatus(20L, OfferStatus.ACCEPTED)).thenReturn(true);
+
+        ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                () -> service.apply(authentication, 9L));
+
+        assertEquals(400, error.getStatusCode().value());
+        assertEquals("You have already accepted a placement offer. You cannot apply for another drive.", error.getReason());
+        verifyNoInteractions(drives);
+    }
+
+    @Test
+    void selectedStudentCanDecideOfferOnlyOnce() {
+        Student student = mock(Student.class);
+        PlacementApplication application = mock(PlacementApplication.class);
+        PlacementDrive selectedDrive = mock(PlacementDrive.class);
+        when(authorization.student(authentication)).thenReturn(student);
+        when(student.getId()).thenReturn(20L);
+        when(application.getStudent()).thenReturn(student);
+        when(application.getStatus()).thenReturn(ApplicationStatus.SELECTED);
+        when(application.getOfferStatus()).thenReturn(null);
+        when(application.getDrive()).thenReturn(selectedDrive);
+        when(selectedDrive.getId()).thenReturn(9L);
+        when(application.getId()).thenReturn(30L);
+        when(application.getAppliedAt()).thenReturn(Instant.now());
+        when(applications.findById(30L)).thenReturn(Optional.of(application));
+        when(applications.save(application)).thenReturn(application);
+
+        service.decideOffer(authentication, 30L, new OfferDecisionRequest(OfferStatus.ACCEPTED));
+
+        verify(application).decideOffer(OfferStatus.ACCEPTED);
+        verify(applications).save(application);
+    }
+
+    @Test
+    void repeatedOfferDecisionIsRejected() {
+        Student student = mock(Student.class);
+        PlacementApplication application = mock(PlacementApplication.class);
+        when(authorization.student(authentication)).thenReturn(student);
+        when(student.getId()).thenReturn(20L);
+        when(application.getStudent()).thenReturn(student);
+        when(application.getStatus()).thenReturn(ApplicationStatus.SELECTED);
+        when(application.getOfferStatus()).thenReturn(OfferStatus.DECLINED);
+        when(applications.findById(30L)).thenReturn(Optional.of(application));
+
+        ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                () -> service.decideOffer(authentication, 30L, new OfferDecisionRequest(OfferStatus.ACCEPTED)));
+
+        assertEquals(409, error.getStatusCode().value());
+        verify(applications, never()).save(any());
     }
 
     @Test
@@ -279,7 +409,7 @@ class PlacementServiceTest {
                 () -> service.apply(authentication, 9L));
 
         assertEquals(403, error.getStatusCode().value());
-        verifyNoInteractions(applications);
+        verify(applications, never()).save(any());
     }
 
     @Test
@@ -301,13 +431,28 @@ class PlacementServiceTest {
         when(authorization.staff(authentication)).thenReturn(dtpo);
         when(dtpo.getRole()).thenReturn(UserRole.DTPO);
         when(dtpo.getDepartment()).thenReturn(department);
-        when(applications.findStaffApplications(eq(2L), eq(ApplicationStatus.SHORTLISTED), eq("mca"), any(Pageable.class)))
+        when(applications.findStaffApplications(eq(2L), eq(ApplicationStatus.SHORTLISTED), isNull(), isNull(), isNull(), eq("mca"), any(Pageable.class)))
                 .thenReturn(Page.empty());
 
-        StaffApplicationPageResponse response = service.listStaffApplications(authentication, 0, 25, "mca", ApplicationStatus.SHORTLISTED);
+        StaffApplicationPageResponse response = service.listStaffApplications(authentication, 0, 25, "mca", ApplicationStatus.SHORTLISTED, null, null, null);
 
         assertEquals(0, response.totalElements());
-        verify(applications).findStaffApplications(eq(2L), eq(ApplicationStatus.SHORTLISTED), eq("mca"), any(Pageable.class));
+        verify(applications).findStaffApplications(eq(2L), eq(ApplicationStatus.SHORTLISTED), isNull(), isNull(), isNull(), eq("mca"), any(Pageable.class));
+    }
+
+    @Test
+    void applicationListingPassesCompanyAndCgpaFilters() {
+        UserAccount utpo = mock(UserAccount.class);
+        when(authorization.staff(authentication)).thenReturn(utpo);
+        when(utpo.getRole()).thenReturn(UserRole.UTPO);
+        when(applications.findStaffApplications(isNull(), isNull(), eq(4L), eq(new java.math.BigDecimal("7.00")),
+                eq(new java.math.BigDecimal("9.00")), isNull(), any(Pageable.class))).thenReturn(Page.empty());
+
+        service.listStaffApplications(authentication, 0, 25, null, null, 4L,
+                new java.math.BigDecimal("7.00"), new java.math.BigDecimal("9.00"));
+
+        verify(applications).findStaffApplications(isNull(), isNull(), eq(4L), eq(new java.math.BigDecimal("7.00")),
+                eq(new java.math.BigDecimal("9.00")), isNull(), any(Pageable.class));
     }
 
     @Test
@@ -315,12 +460,12 @@ class PlacementServiceTest {
         UserAccount utpo = mock(UserAccount.class);
         when(authorization.staff(authentication)).thenReturn(utpo);
         when(utpo.getRole()).thenReturn(UserRole.UTPO);
-        when(applications.findStaffApplications(isNull(), isNull(), isNull(), any(Pageable.class))).thenReturn(Page.empty());
+        when(applications.findStaffApplications(isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), any(Pageable.class))).thenReturn(Page.empty());
 
-        StaffApplicationPageResponse response = service.listStaffApplications(authentication, 0, 25, "", null);
+        StaffApplicationPageResponse response = service.listStaffApplications(authentication, 0, 25, "", null, null, null, null);
 
         assertEquals(0, response.items().size());
-        verify(applications).findStaffApplications(isNull(), isNull(), isNull(), any(Pageable.class));
+        verify(applications).findStaffApplications(isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), any(Pageable.class));
     }
 
     @Test
@@ -357,7 +502,7 @@ class PlacementServiceTest {
                 org.springframework.http.HttpStatus.FORBIDDEN, "Staff access is required"));
 
         ResponseStatusException error = assertThrows(ResponseStatusException.class,
-                () -> service.listStaffApplications(authentication, 0, 25, null, null));
+                () -> service.listStaffApplications(authentication, 0, 25, null, null, null, null, null));
 
         assertEquals(403, error.getStatusCode().value());
         verifyNoInteractions(applications);

@@ -71,6 +71,7 @@ public class UserAccount {
 
     public void updateFullName(String fullName) { this.fullName = fullName; }
     public void setRole(Role role) { this.role = role; }
+    public void setDepartment(Department department) { this.department = department; }
     public void setStudent(Student student) { this.student = student; }
 }
 

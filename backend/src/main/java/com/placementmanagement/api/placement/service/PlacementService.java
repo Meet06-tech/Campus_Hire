@@ -87,6 +87,21 @@ public class PlacementService {
     }
 
     @Transactional
+    public DriveResponse cancelDrive(Authentication auth, Long driveId) {
+        UserAccount user = authorization.staff(auth);
+        PlacementDrive drive = drives.findById(driveId).orElseThrow(() -> notFound("Placement drive"));
+        if (user.getRole() == UserRole.DTPO) {
+            Department department = requireDepartment(user);
+            if (drive.getDepartment() == null || !department.getId().equals(drive.getDepartment().getId()))
+                throw forbidden("DTPO cannot cancel a drive outside its department");
+        }
+        if (drive.getStatus() != DriveStatus.DRAFT && drive.getStatus() != DriveStatus.PUBLISHED)
+            throw bad("Only draft or published drives can be cancelled");
+        drive.setStatus(DriveStatus.CANCELLED);
+        return drive(drive);
+    }
+
+    @Transactional
     public DriveResponse publishDrive(Authentication auth, Long driveId) {
         UserAccount user = authorization.staff(auth);
         PlacementDrive drive = drives.findById(driveId).orElseThrow(() -> notFound("Placement drive"));
@@ -102,18 +117,21 @@ public class PlacementService {
     public List<DriveResponse> listStudentDrives(Authentication auth) {
         Student student = authorization.student(auth);
         return drives.findVisiblePublished(DriveStatus.PUBLISHED, student.getDepartment().getId()).stream()
+                .filter(d -> d.getStatus() == DriveStatus.PUBLISHED)
                 .filter(d -> eligible(student, d)).map(this::drive).toList();
     }
 
     @Transactional
     public ApplicationResponse apply(Authentication auth, Long driveId) {
         Student student = authorization.student(auth);
+        if (applications.existsByStudent_IdAndOfferStatus(student.getId(), OfferStatus.ACCEPTED))
+            throw bad("You have already accepted a placement offer. You cannot apply for another drive.");
         PlacementDrive drive = drives.findById(driveId).orElseThrow(() -> notFound("Placement drive"));
         if (drive.getStatus() != DriveStatus.PUBLISHED) throw bad("Applications are closed for this drive");
         if (drive.getApplicationDeadline().isBefore(Instant.now())) throw bad("Application deadline has passed");
         if (drive.getDepartment() != null && !drive.getDepartment().getId().equals(student.getDepartment().getId())) throw forbidden("Drive is outside your department");
         if (!eligible(student, drive)) throw forbidden("Student does not meet the drive eligibility rules");
-        if (applications.existsByDrive_IdAndStudent_Id(driveId, student.getId())) throw conflict("Already applied to this drive");
+        if (applications.existsByDrive_IdAndStudent_Id(driveId, student.getId())) throw conflict("You have already applied to this placement drive");
         return application(applications.save(new PlacementApplication(drive, student)));
     }
 
@@ -123,14 +141,35 @@ public class PlacementService {
         return applications.findAllByStudent_IdOrderByAppliedAtDesc(student.getId()).stream().map(this::application).toList();
     }
 
+    @Transactional
+    public ApplicationResponse decideOffer(Authentication auth, Long applicationId, OfferDecisionRequest request) {
+        Student student = authorization.student(auth);
+        if (request == null || request.decision() == null) throw bad("Offer decision is required");
+        PlacementApplication application = applications.findById(applicationId)
+                .orElseThrow(() -> notFound("Application"));
+        if (!application.getStudent().getId().equals(student.getId()))
+            throw forbidden("Application does not belong to the current student");
+        if (application.getStatus() != ApplicationStatus.SELECTED)
+            throw bad("Only selected applications can receive an offer decision");
+        if (application.getOfferStatus() != null)
+            throw conflict("This offer has already been decided");
+        application.decideOffer(request.decision());
+        applications.save(application);
+        return application(application);
+    }
+
     @Transactional(readOnly = true)
     public StaffApplicationPageResponse listStaffApplications(Authentication auth, int page, int size,
-            String search, ApplicationStatus status) {
+            String search, ApplicationStatus status, Long companyId,
+            BigDecimal minCgpa, BigDecimal maxCgpa) {
         UserAccount user = authorization.staff(auth);
         Pageable pageable = PageRequest.of(page, size);
         Long departmentId = scopedDepartmentId(user);
         String normalizedSearch = search == null || search.isBlank() ? null : search.trim();
-        Page<StaffApplicationProjection> result = applications.findStaffApplications(departmentId, status, normalizedSearch, pageable);
+        if (minCgpa != null && maxCgpa != null && minCgpa.compareTo(maxCgpa) > 0)
+            throw bad("Minimum CGPA cannot exceed maximum CGPA");
+        Page<StaffApplicationProjection> result = applications.findStaffApplications(departmentId, status, companyId,
+                minCgpa, maxCgpa, normalizedSearch, pageable);
         return new StaffApplicationPageResponse(result.getContent().stream().map(this::staffApplication).toList(),
                 result.getNumber(), result.getSize(), result.getTotalElements(), result.getTotalPages());
     }
@@ -233,11 +272,12 @@ public class PlacementService {
     private Department requireDepartment(UserAccount user) { if (user.getDepartment() == null) throw bad("Staff department is not configured"); return user.getDepartment(); }
     private CompanyResponse company(Company c) { return new CompanyResponse(c.getId(), c.getName(), c.getDescription(), c.getWebsite(), c.getHrContactName(), c.getHrContactEmail(), c.getHrContactPhone()); }
     private DriveResponse drive(PlacementDrive d) { return new DriveResponse(d.getId(), company(d.getCompany()), d.getDepartment() == null ? null : d.getDepartment().getId(), d.getTitle(), d.getJobDescription(), d.getJobType(), d.getLocation(), d.getPackageSalary(), d.getApplicationDeadline(), d.getStatus(), d.getMinimumCgpa(), d.getGraduationYear(), d.getMaximumActiveBacklogs(), d.getPrograms().stream().map(PlacementProgram::getCode).toList()); }
-    private ApplicationResponse application(PlacementApplication a) { return new ApplicationResponse(a.getId(), a.getDrive().getId(), a.getStudent().getId(), a.getAppliedAt(), a.getStatus()); }
+    private ApplicationResponse application(PlacementApplication a) { return new ApplicationResponse(a.getId(), a.getDrive().getId(), a.getStudent().getId(), a.getAppliedAt(), a.getStatus(), a.getOfferStatus(), a.getOfferDecidedAt()); }
     private StaffApplicationResponse staffApplication(StaffApplicationProjection p) {
         return new StaffApplicationResponse(p.getApplicationId(), p.getStudentId(), p.getStudentName(), p.getUniversityEmail(),
                 p.getEnrollmentNumber(), p.getDepartmentId(), p.getDepartmentCode(), p.getDepartmentName(), p.getAcademicProgram(),
-                p.getDriveId(), p.getDriveTitle(), p.getCompanyName(), p.getAppliedAt(), p.getStatus());
+                p.getDriveId(), p.getDriveTitle(), p.getCompanyName(), p.getAppliedAt(), p.getStatus(),
+                p.getStudentCgpa(), p.getStudentGraduationYear());
     }
     private StaffStudentResponse staffStudent(StaffStudentProjection p) {
         return new StaffStudentResponse(p.getStudentId(), p.getFullName(), p.getUniversityEmail(), p.getEnrollmentNumber(),

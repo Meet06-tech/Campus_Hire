@@ -100,6 +100,17 @@ class AuthServiceRegistrationTest {
     }
 
     @Test
+    void rejectsMismatchedConfirmationBeforePersistence() {
+        ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                () -> service.register(new RegisterRequest(
+                        "Student One", "ENR-1", "25mca001@charusat.edu.in", "safe-password", "different-password")));
+
+        assertEquals(HttpStatus.BAD_REQUEST, error.getStatusCode());
+        assertEquals("Passwords do not match", error.getReason());
+        verifyNoInteractions(users, departmentEmailCodes, emailParser, roles, passwordEncoder, students);
+    }
+
+    @Test
     void rejectsInactiveDepartmentBeforePersistence() {
         Department department = org.mockito.Mockito.mock(Department.class);
         DepartmentEmailCode mapping = org.mockito.Mockito.mock(DepartmentEmailCode.class);

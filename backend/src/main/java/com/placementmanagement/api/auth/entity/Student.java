@@ -5,6 +5,8 @@ import com.placementmanagement.api.auth.entity.UserAccount;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -15,6 +17,8 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.ElementCollection;
 
 @Entity
 @Table(name = "students")
@@ -62,6 +66,11 @@ public class Student {
     @Column(name = "profile_photo_key", length = 255)
     private String profilePhotoKey;
 
+    @ElementCollection
+    @CollectionTable(name = "student_skills", joinColumns = @JoinColumn(name = "student_id"))
+    @Column(name = "skill_name", nullable = false, length = 100)
+    private Set<String> skills = new LinkedHashSet<>();
+
     protected Student() {
     }
 
@@ -85,10 +94,18 @@ public class Student {
     public BigDecimal getCgpa() { return cgpa; }
     public String getCareerProfile() { return careerProfile; }
     public String getProfilePhotoKey() { return profilePhotoKey; }
+    public Set<String> getSkills() { return skills; }
 
     public void updateProfile(Short admissionYear, Short graduationYear, LocalDate dateOfBirth,
             String phoneNumber, String academicProgram, Short currentSemester,
             BigDecimal cgpa, String careerProfile) {
+        updateProfile(admissionYear, graduationYear, dateOfBirth, phoneNumber, academicProgram,
+                currentSemester, cgpa, careerProfile, null);
+    }
+
+    public void updateProfile(Short admissionYear, Short graduationYear, LocalDate dateOfBirth,
+            String phoneNumber, String academicProgram, Short currentSemester,
+            BigDecimal cgpa, String careerProfile, Set<String> updatedSkills) {
         this.admissionYear = admissionYear;
         this.graduationYear = graduationYear;
         this.dateOfBirth = dateOfBirth;
@@ -97,6 +114,10 @@ public class Student {
         this.currentSemester = currentSemester;
         this.cgpa = cgpa;
         this.careerProfile = careerProfile;
+        if (updatedSkills != null) {
+            this.skills.clear();
+            this.skills.addAll(updatedSkills);
+        }
     }
 
     public void updateProfilePhotoKey(String profilePhotoKey) {

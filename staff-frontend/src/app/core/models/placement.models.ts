@@ -66,6 +66,8 @@ export interface StaffApplication {
   companyName: string;
   appliedAt: string;
   status: ApplicationStatus;
+  studentCgpa: number | null;
+  studentGraduationYear: number | null;
 }
 
 export interface StaffApplicationPage {
@@ -106,4 +108,74 @@ export interface DashboardSummary {
   selectedApplications: number;
   students: number;
   studentsWithApplications: number;
+}
+
+export interface DepartmentInfo {
+  id: number;
+  code: string;
+  name: string;
+}
+
+export interface CoordinatorRequest {
+  fullName: string;
+  universityEmail: string;
+  departmentId: number | null;
+  initialPassword: string;
+}
+
+export interface Coordinator {
+  id: number;
+  fullName: string;
+  universityEmail: string;
+  department: DepartmentInfo;
+  active: boolean;
+}
+
+export type RoundResultStatus = 'PENDING' | 'PASSED' | 'FAILED';
+export interface RecruitmentRound {
+  id: number;
+  driveId: number;
+  order: number;
+  name: string;
+  finalRound: boolean;
+  resultsPublished: boolean;
+  totalCandidates: number;
+  passed: number;
+  failed: number;
+  pending: number;
+}
+export interface RoundRequest { name: string; order: number; finalRound: boolean; }
+export interface ApplicationResponse {
+  id: number;
+  driveId: number;
+  studentId: number;
+  appliedAt: string;
+  status: ApplicationStatus;
+}
+
+export interface RoundCandidate {
+  applicationId: number;
+  studentId: number;
+  studentName: string;
+  enrollmentNumber: string;
+  academicProgram: string | null;
+  result: RoundResultStatus;
+  applicationStatus: ApplicationStatus;
+}
+export interface StudentRoundProgress {
+  roundId: number;
+  order: number;
+  name: string;
+  resultsPublished: boolean;
+  status: 'CLEARED' | 'NOT_CLEARED' | 'AWAITING_RESULT' | 'UPCOMING';
+}
+export interface StudentApplicationProgress {
+  applicationId: number;
+  driveId: number;
+  companyName: string;
+  driveTitle: string;
+  appliedAt: string;
+  applicationStatus: ApplicationStatus;
+  finalOutcome: 'SELECTED' | 'NOT_SELECTED' | null;
+  rounds: StudentRoundProgress[];
 }
