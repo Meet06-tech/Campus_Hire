@@ -7,9 +7,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.placementmanagement.api.auth.dto.AuthDtos.AuthResponse;
+import com.placementmanagement.api.auth.dto.AuthDtos.DepartmentInfo;
 import com.placementmanagement.api.auth.dto.AuthDtos.LoginRequest;
 import com.placementmanagement.api.auth.dto.AuthDtos.RegisterRequest;
-import com.placementmanagement.api.auth.dto.AuthDtos.DepartmentInfo;
 import com.placementmanagement.api.auth.entity.Department;
 import com.placementmanagement.api.auth.entity.DepartmentEmailCode;
 import com.placementmanagement.api.auth.entity.Student;
@@ -30,11 +30,22 @@ public class AuthService {
     private final RoleRepository roles;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final StaffEmailAllowlist staffEmailAllowlist;
 
+    /** Backward-compatible constructor for existing unit tests and callers using student login only. */
     public AuthService(UserAccountRepository users, StudentRepository students,
             DepartmentEmailCodeRepository departmentEmailCodes,
             UniversityEmailParser emailParser, RoleRepository roles,
             PasswordEncoder passwordEncoder, JwtService jwtService) {
+        this(users, students, departmentEmailCodes, emailParser, roles, passwordEncoder, jwtService,
+                new StaffEmailAllowlist(""));
+    }
+
+    public AuthService(UserAccountRepository users, StudentRepository students,
+            DepartmentEmailCodeRepository departmentEmailCodes,
+            UniversityEmailParser emailParser, RoleRepository roles,
+            PasswordEncoder passwordEncoder, JwtService jwtService,
+            StaffEmailAllowlist staffEmailAllowlist) {
         this.users = users;
         this.students = students;
         this.departmentEmailCodes = departmentEmailCodes;
@@ -42,6 +53,7 @@ public class AuthService {
         this.roles = roles;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.staffEmailAllowlist = staffEmailAllowlist;
     }
 
     @Transactional
@@ -87,22 +99,44 @@ public class AuthService {
                     "Provide exactly one of identifier or enrollmentNumber");
         }
         String password = required(request.password(), "Password");
-        UserAccount user = (hasIdentifier
-                ? users.findByUniversityEmailIgnoreCase(required(request.identifier(), "Identifier"))
-                : users.findByStudentEnrollmentNumber(required(request.enrollmentNumber(), "Enrollment number")))
+        String identifier = hasIdentifier
+                ? required(request.identifier(), "Identifier")
+                : required(request.enrollmentNumber(), "Enrollment number");
+        java.util.Optional<UserAccount> candidate = hasIdentifier
+                ? findStaffByEmail(identifier)
+                : users.findByStudentEnrollmentNumber(identifier);
+        UserAccount user = candidate
                 .filter(UserAccount::isEnabled)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials"));
         if (!passwordEncoder.matches(password, user.getPasswordHash())) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
         }
-        return response(user);
+        return response(user, supportedRole(user));
     }
 
     private AuthResponse response(UserAccount user) {
-        Department department = user.getDepartment();
+        return response(user, supportedRole(user));
+    }
+
+    private AuthResponse response(UserAccount user, UserRole role) {
         return new AuthResponse(jwtService.createToken(user), user.getId().toString(), user.getFullName(),
-                user.getStudent() == null ? null : user.getStudent().getEnrollmentNumber(), user.getRole().name(),
-                department == null ? null : new DepartmentInfo(department.getId(), department.getCode(), department.getName()));
+                user.getStudent() == null ? null : user.getStudent().getEnrollmentNumber(), role.name(),
+                user.getDepartment() == null ? null
+                        : new DepartmentInfo(user.getDepartment().getId(), user.getDepartment().getCode(),
+                                user.getDepartment().getName()));
+    }
+
+    private java.util.Optional<UserAccount> findStaffByEmail(String identifier) {
+        if (!staffEmailAllowlist.isAllowed(identifier)) return java.util.Optional.empty();
+        return users.findByUniversityEmailIgnoreCase(identifier.toLowerCase(java.util.Locale.ROOT));
+    }
+
+    private UserRole supportedRole(UserAccount user) {
+        try {
+            return user.getRole();
+        } catch (RuntimeException exception) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
+        }
     }
 
     private String required(String value, String field) {

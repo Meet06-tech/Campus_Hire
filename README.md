@@ -46,10 +46,19 @@ export JWT_SECRET=replace-with-a-long-random-local-secret
 
 Secrets should stay in your local shell or an uncommitted `.env` file.
 
+Provisioned staff email login is allowlisted separately. Set the exact approved
+domain or comma-separated approved domains; do not use a leading wildcard or
+substring. If unset or blank, staff email login is disabled:
+
+```bash
+export STAFF_ALLOWED_EMAIL_DOMAINS=charusat.ac.in
+```
+
 Authentication endpoints:
 
 - `POST /api/auth/register` with `fullName`, `enrollmentNumber`, `universityEmail`, and `password`
-- `POST /api/auth/login` with `enrollmentNumber` and `password`
+- `POST /api/auth/login` with `enrollmentNumber` and `password` for students,
+  or `identifier` and `password` for provisioned staff accounts
 
 Both successful requests return a JWT token. Send it on later protected requests as `Authorization: Bearer <token>`.
 

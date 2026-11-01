@@ -25,6 +25,7 @@ import com.placementmanagement.api.auth.repository.StudentRepository;
 import com.placementmanagement.api.auth.repository.UserAccountRepository;
 import com.placementmanagement.api.auth.security.JwtService;
 import com.placementmanagement.api.auth.service.AuthService;
+import com.placementmanagement.api.auth.service.StaffEmailAllowlist;
 import com.placementmanagement.api.auth.service.UniversityEmailParser;
 
 @ExtendWith(MockitoExtension.class)
@@ -36,11 +37,12 @@ class AuthServiceLoginTest {
     @Mock RoleRepository roles;
     @Mock PasswordEncoder encoder;
     @Mock JwtService jwt;
+    @Mock StaffEmailAllowlist allowlist;
     private AuthService service;
 
     @BeforeEach
     void setUp() {
-        service = new AuthService(users, students, departmentEmailCodes, emailParser, roles, encoder, jwt);
+        service = new AuthService(users, students, departmentEmailCodes, emailParser, roles, encoder, jwt, allowlist);
     }
 
     @Test
@@ -68,6 +70,7 @@ class AuthServiceLoginTest {
 
     @Test
     void staffLoginUsesEmailAndDoesNotRequireStudent() {
+        when(allowlist.isAllowed("dtpo@charusat.ac.in")).thenReturn(true);
         Department department = mock(Department.class);
         when(department.getId()).thenReturn(2L);
         when(department.getCode()).thenReturn("MCA");
@@ -93,6 +96,7 @@ class AuthServiceLoginTest {
 
     @Test
     void utpoLoginUsesEmailWithoutStudentOrDepartment() {
+        when(allowlist.isAllowed("utpo@charusat.ac.in")).thenReturn(true);
         UserAccount user = mock(UserAccount.class);
         when(user.isEnabled()).thenReturn(true);
         when(user.getId()).thenReturn(11L);
@@ -114,6 +118,7 @@ class AuthServiceLoginTest {
 
     @Test
     void invalidPasswordIsRejected() {
+        when(allowlist.isAllowed("utpo@charusat.ac.in")).thenReturn(true);
         UserAccount user = mock(UserAccount.class);
         when(user.isEnabled()).thenReturn(true);
         when(user.getPasswordHash()).thenReturn("bcrypt-hash");

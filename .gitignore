@@ -19,6 +19,13 @@ flutter_app/ios/Pods/
 flutter_app/coverage/
 
 # ==========================================
+# Angular / Node.js - Staff Frontend
+# ==========================================
+staff-frontend/node_modules/
+staff-frontend/dist/
+staff-frontend/.angular/
+
+# ==========================================
 # Local environment and secrets
 # ==========================================
 .env

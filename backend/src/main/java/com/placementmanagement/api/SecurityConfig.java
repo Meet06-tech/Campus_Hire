@@ -56,6 +56,11 @@ public class SecurityConfig {
 
     @Bean
     PasswordEncoder passwordEncoder() {
+        return createPasswordEncoder();
+    }
+
+    /** Shared encoder factory for local operator tools; it does not start Spring or access the database. */
+    public static PasswordEncoder createPasswordEncoder() {
         return new BCryptPasswordEncoder();
     }
 }

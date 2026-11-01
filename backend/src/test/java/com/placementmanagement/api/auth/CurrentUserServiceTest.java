@@ -162,4 +162,30 @@ class CurrentUserServiceTest {
                 new java.util.LinkedHashSet<>(java.util.List.of("Java", "Custom Skill")));
         verify(students).save(student);
     }
+
+    @Test
+    void returnsAssignedUserDepartmentForStaffWithoutStudentProfile() {
+        when(user.getRole()).thenReturn(UserRole.DTPO);
+        when(user.getStudent()).thenReturn(null);
+        when(user.getDepartment()).thenReturn(department);
+
+        MeResponse response = service.currentUser(authentication);
+
+        assertEquals("MCA", response.department().code());
+        assertEquals(null, response.enrollmentNumber());
+        assertEquals(null, response.profile());
+    }
+
+    @Test
+    void returnsNullDepartmentForUniversityTpoWithoutAssignment() {
+        when(user.getRole()).thenReturn(UserRole.UTPO);
+        when(user.getStudent()).thenReturn(null);
+        when(user.getDepartment()).thenReturn(null);
+
+        MeResponse response = service.currentUser(authentication);
+
+        assertEquals("UTPO", response.role());
+        assertEquals(null, response.department());
+        assertEquals(null, response.enrollmentNumber());
+    }
 }
