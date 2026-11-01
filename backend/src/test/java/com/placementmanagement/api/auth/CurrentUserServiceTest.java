@@ -147,19 +147,18 @@ class CurrentUserServiceTest {
     }
 
     @Test
-    void updatesSkillsAndOtherFieldsWhenExistingSemesterIsUnchangedAndDurationIsNotConfigured() {
+    void updatesSemesterWhenProgramDurationIsNotConfigured() {
         when(programs.findByCodeIgnoreCase("MCA")).thenReturn(Optional.empty());
         when(student.getAcademicProgram()).thenReturn("MCA");
         when(student.getCurrentSemester()).thenReturn((short) 2);
         CurrentUserService durationAwareService = new CurrentUserService(users, students, programs);
 
         durationAwareService.updateCurrentUser(authentication,
-                new ProfileUpdateRequest("Updated Student", null, null, null, null,
-                        "MCA", 2, null, null, java.util.List.of("Java", "Custom Skill")));
+                new ProfileUpdateRequest(null, null, null, null, null,
+                        "MCA", 3, null, null));
 
         verify(student).updateProfile(
-                (short) 2025, (short) 2029, null, null, "MCA", (short) 2, new BigDecimal("8.50"), null,
-                new java.util.LinkedHashSet<>(java.util.List.of("Java", "Custom Skill")));
+                (short) 2025, (short) 2029, null, null, "MCA", (short) 3, new BigDecimal("8.50"), null, null);
         verify(students).save(student);
     }
 

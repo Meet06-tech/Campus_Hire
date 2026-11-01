@@ -220,13 +220,12 @@ public class CurrentUserService {
                     "Academic program is required to validate semester duration");
         }
         if (programs == null) return;
-        PlacementProgram program = programs.findByCodeIgnoreCase(requestedProgram.trim())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                        "Program duration is not configured for this academic program"));
-        if (program.getDurationSemesters() == null || semester > program.getDurationSemesters()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Semester must be within your program duration");
-        }
+        programs.findByCodeIgnoreCase(requestedProgram.trim()).ifPresent(program -> {
+            if (program.getDurationSemesters() != null && semester > program.getDurationSemesters()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Semester must be within your program duration");
+            }
+        });
     }
 
     private Set<String> normalizeSkills(List<String> values) {
