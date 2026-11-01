@@ -2,6 +2,7 @@
 # Java / Maven - Spring Boot
 # ==========================================
 backend/target/
+backend/var/uploads/
 *.class
 *.log
 
@@ -16,6 +17,13 @@ flutter_app/build/
 flutter_app/.pub-cache/
 flutter_app/ios/Pods/
 flutter_app/coverage/
+
+# ==========================================
+# Angular / Node.js - Staff Frontend
+# ==========================================
+staff-frontend/node_modules/
+staff-frontend/dist/
+staff-frontend/.angular/
 
 # ==========================================
 # Local environment and secrets

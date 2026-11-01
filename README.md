@@ -46,12 +46,34 @@ export JWT_SECRET=replace-with-a-long-random-local-secret
 
 Secrets should stay in your local shell or an uncommitted `.env` file.
 
+Provisioned staff email login is allowlisted separately. Set the exact approved
+domain or comma-separated approved domains; do not use a leading wildcard or
+substring. If unset or blank, staff email login is disabled:
+
+```bash
+export STAFF_ALLOWED_EMAIL_DOMAINS=charusat.ac.in
+```
+
 Authentication endpoints:
 
 - `POST /api/auth/register` with `fullName`, `enrollmentNumber`, `universityEmail`, and `password`
-- `POST /api/auth/login` with `enrollmentNumber` and `password`
+- `POST /api/auth/login` with `enrollmentNumber` and `password` for students,
+  or `identifier` and `password` for provisioned staff accounts
 
 Both successful requests return a JWT token. Send it on later protected requests as `Authorization: Bearer <token>`.
+
+## Student profile photos
+
+Profile photos are stored by the backend outside the source tree under
+`./var/uploads/profile-photos` by default. Set `PROFILE_PHOTO_STORAGE_DIR` to
+an absolute or deployment-specific directory when needed. The server accepts
+validated JPEG and PNG images up to 5 MB; the database stores only a generated
+relative photo key. The upload directory is intentionally git-ignored.
+
+Before starting the backend after this feature is applied, the database owner
+must run `backend/src/main/resources/db/migration/V3__add_student_profile_photo_key.sql`
+against the existing database. Hibernate remains configured with
+`ddl-auto=validate` and will not create the column automatically.
 
 ## Run the Flutter shell
 
