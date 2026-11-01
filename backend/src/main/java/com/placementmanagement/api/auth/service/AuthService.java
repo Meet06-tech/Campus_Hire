@@ -1,5 +1,6 @@
 package com.placementmanagement.api.auth.service;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -41,6 +42,7 @@ public class AuthService {
                 new StaffEmailAllowlist(""));
     }
 
+    @Autowired
     public AuthService(UserAccountRepository users, StudentRepository students,
             DepartmentEmailCodeRepository departmentEmailCodes,
             UniversityEmailParser emailParser, RoleRepository roles,
