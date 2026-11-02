@@ -130,6 +130,8 @@ public class RecruitmentService {
         if (!Objects.equals(application.getDrive().getId(), drive.getId())) throw notFound("Application");
         if (application.getStatus() == ApplicationStatus.WITHDRAWN)
             throw bad("Withdrawn applications cannot receive final outcomes");
+        if (application.getStatus() == ApplicationStatus.APPLICATION_REJECTED)
+            throw bad("Application-rejected records cannot receive final outcomes");
         if (!passedAllPreviousRounds(application, drive, finalRound))
             throw bad("Only a student who passed all previous rounds can receive an outcome");
         application.setStatus(request.outcome());
@@ -148,7 +150,8 @@ public class RecruitmentService {
         Student student = authorization.student(auth);
         return applications.findAllByStudent_IdOrderByAppliedAtDesc(student.getId()).stream()
                 .filter(application -> application.getStatus() != ApplicationStatus.SELECTED
-                        && application.getStatus() != ApplicationStatus.REJECTED)
+                        && application.getStatus() != ApplicationStatus.REJECTED
+                        && application.getStatus() != ApplicationStatus.APPLICATION_REJECTED)
                 .map(this::progress).toList();
     }
 
@@ -157,7 +160,8 @@ public class RecruitmentService {
         Student student = authorization.student(auth);
         return applications.findAllByStudent_IdOrderByAppliedAtDesc(student.getId()).stream()
                 .filter(application -> application.getStatus() == ApplicationStatus.SELECTED
-                        || application.getStatus() == ApplicationStatus.REJECTED)
+                        || application.getStatus() == ApplicationStatus.REJECTED
+                        || application.getStatus() == ApplicationStatus.APPLICATION_REJECTED)
                 .map(this::progress).toList();
     }
 
@@ -186,7 +190,8 @@ public class RecruitmentService {
 
     private List<PlacementApplication> candidateApplications(RecruitmentRound round, PlacementDrive drive) {
         return applications.findAllByDrive_IdOrderByAppliedAtAsc(drive.getId()).stream()
-                .filter(application -> application.getStatus() != ApplicationStatus.WITHDRAWN)
+                .filter(application -> application.getStatus() != ApplicationStatus.WITHDRAWN
+                        && application.getStatus() != ApplicationStatus.APPLICATION_REJECTED)
                 .filter(application -> round.getOrder() == 1 || (round.isFinalRound()
                         ? passedAllPreviousRounds(application, drive, round)
                         : passedPreviousRound(application, drive, round)))
@@ -238,6 +243,8 @@ public class RecruitmentService {
     private PlacementDrive managedDrive(Authentication auth, Long driveId) {
         UserAccount user = authorization.staff(auth);
         PlacementDrive drive = drives.findById(driveId).orElseThrow(() -> notFound("Placement drive"));
+        if (drive.getStatus() == DriveStatus.CANCELLED)
+            throw bad("Cancelled drives are not available for round management");
         if (user.getRole() == UserRole.DTPO) {
             Department department = user.getDepartment();
             if (department == null || drive.getDepartment() == null || !department.getId().equals(drive.getDepartment().getId()))

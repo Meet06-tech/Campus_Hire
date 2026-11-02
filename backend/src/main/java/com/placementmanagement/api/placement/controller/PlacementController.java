@@ -87,6 +87,8 @@ public class PlacementController {
     public DriveResponse createDrive(@RequestBody DriveRequest request, Authentication auth) { return service.createDrive(auth, request); }
     @GetMapping("/drives")
     public List<DriveResponse> staffDrives(Authentication auth) { return service.listStaffDrives(auth); }
+    @GetMapping("/round-management/drives")
+    public List<DriveResponse> roundManagementDrives(Authentication auth) { return service.listRoundManagementDrives(auth); }
     @PostMapping("/drives/{driveId}/publish")
     public DriveResponse publishDrive(@PathVariable Long driveId, Authentication auth) { return service.publishDrive(auth, driveId); }
     @PostMapping("/drives/{driveId}/cancel")
@@ -95,6 +97,9 @@ public class PlacementController {
     public List<DriveResponse> studentDrives(Authentication auth) { return service.listStudentDrives(auth); }
     @PostMapping("/student/drives/{driveId}/applications") @ResponseStatus(HttpStatus.CREATED)
     public ApplicationResponse apply(@PathVariable Long driveId, Authentication auth) { return service.apply(auth, driveId); }
+    @PostMapping("/drives/{driveId}/applications/{applicationId}/reject")
+    public ApplicationResponse rejectApplication(@PathVariable Long driveId, @PathVariable Long applicationId,
+            Authentication auth) { return service.rejectApplication(auth, driveId, applicationId); }
     @GetMapping("/student/applications")
     public List<ApplicationResponse> applications(Authentication auth) { return service.myApplications(auth); }
     @PutMapping("/student/applications/{applicationId}/offer")

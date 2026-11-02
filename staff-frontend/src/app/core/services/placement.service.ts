@@ -24,6 +24,10 @@ export class PlacementService {
     return this.http.get<PlacementDrive[]>(`${this.apiUrl}/api/placement/drives`);
   }
 
+  listRoundManagementDrives(): Observable<PlacementDrive[]> {
+    return this.http.get<PlacementDrive[]>(`${this.apiUrl}/api/placement/round-management/drives`);
+  }
+
   createDrive(request: DriveRequest): Observable<PlacementDrive> {
     return this.http.post<PlacementDrive>(`${this.apiUrl}/api/placement/drives`, request);
   }
@@ -91,5 +95,9 @@ export class PlacementService {
   }
   setFinalOutcome(driveId: number, applicationId: number, outcome: 'SELECTED' | 'REJECTED'): Observable<ApplicationResponse> {
     return this.http.put<ApplicationResponse>(`${this.apiUrl}/api/placement/drives/${driveId}/applications/${applicationId}/outcome`, { outcome });
+  }
+
+  rejectApplication(driveId: number, applicationId: number): Observable<ApplicationResponse> {
+    return this.http.post<ApplicationResponse>(`${this.apiUrl}/api/placement/drives/${driveId}/applications/${applicationId}/reject`, {});
   }
 }

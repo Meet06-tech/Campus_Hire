@@ -640,6 +640,8 @@ class _HistoryApplicationCard extends StatelessWidget {
     final selected =
         application.finalOutcome == 'SELECTED' ||
         application.applicationStatus == 'SELECTED';
+    final applicationRejected =
+        application.applicationStatus == 'APPLICATION_REJECTED';
     final colors = Theme.of(context).colorScheme;
     final normalizedOfferStatus = (application.offerStatus ?? 'PENDING')
         .toUpperCase();
@@ -691,8 +693,12 @@ class _HistoryApplicationCard extends StatelessWidget {
                       : colors.errorContainer,
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: Text(
-                  selected ? offerLabel : 'Not Selected',
+                  child: Text(
+                  selected
+                      ? offerLabel
+                      : applicationRejected
+                          ? 'Application Rejected'
+                          : 'Not Selected',
                   style: TextStyle(
                     color: selected ? offerBadgeText : colors.onErrorContainer,
                     fontWeight: FontWeight.w700,
@@ -704,7 +710,9 @@ class _HistoryApplicationCard extends StatelessWidget {
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'Company result: $companyResult',
+                applicationRejected
+                    ? 'Application rejected before recruitment rounds'
+                    : 'Company result: $companyResult',
                 style: TextStyle(color: colors.onSurfaceVariant, fontSize: 13),
               ),
             ),
@@ -1206,6 +1214,9 @@ String _applicationStatusLabel(StudentApplicationProgress application) {
       application.applicationStatus == 'REJECTED') {
     return 'Not selected';
   }
+  if (application.applicationStatus == 'APPLICATION_REJECTED') {
+    return 'Application rejected';
+  }
   if (application.applicationStatus == 'WITHDRAWN') {
     return 'Withdrawn';
   }
@@ -1232,6 +1243,9 @@ Color _statusColor(ColorScheme colors, StudentApplicationProgress application) {
   }
   if (application.finalOutcome == 'NOT_SELECTED' ||
       application.applicationStatus == 'REJECTED') {
+    return colors.error;
+  }
+  if (application.applicationStatus == 'APPLICATION_REJECTED') {
     return colors.error;
   }
   if (application.applicationStatus == 'SHORTLISTED') {

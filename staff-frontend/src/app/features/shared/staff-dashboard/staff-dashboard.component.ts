@@ -45,6 +45,7 @@ export class StaffDashboardComponent implements OnInit {
   user = signal<MeResponse | null>(null);
   companies = signal<Company[]>([]);
   drives = signal<PlacementDrive[]>([]);
+  roundDrives = signal<PlacementDrive[]>([]);
   applications = signal<StaffApplication[]>([]);
   students = signal<StaffStudent[]>([]);
   coordinators = signal<Coordinator[]>([]);
@@ -67,7 +68,6 @@ export class StaffDashboardComponent implements OnInit {
   companyFilter = signal<number | 'ALL'>('ALL');
   minCgpaFilter = signal<number | null>(null);
   maxCgpaFilter = signal<number | null>(null);
-  selectedApplicationIds = signal<number[]>([]);
 
   companyForm: CompanyRequest = this.emptyCompany();
   driveForm: DriveRequest = this.emptyDrive();
@@ -116,6 +116,12 @@ export class StaffDashboardComponent implements OnInit {
     this.activeSection.set(section);
     this.errorMessage.set(null);
     this.successMessage.set(null);
+    if (section === 'rounds') {
+      this.placementService.listRoundManagementDrives().subscribe({
+        next: drives => this.roundDrives.set(drives),
+        error: error => this.errorMessage.set(this.apiError(error, 'Could not load active drives for round management.'))
+      });
+    }
   }
 
   get roleLabel(): string { return this.role === 'DTPO' ? 'Department TPO' : 'University TPO'; }
@@ -158,30 +164,10 @@ export class StaffDashboardComponent implements OnInit {
     });
   }
 
-  allVisibleApplicationsSelected(): boolean {
-    const visible = this.filteredApplications();
-    return visible.length > 0 && visible.every(application => this.selectedApplicationIds().includes(application.id));
-  }
-
-  toggleApplicationSelection(applicationId: number): void {
-    this.selectedApplicationIds.update(ids => ids.includes(applicationId) ? ids.filter(id => id !== applicationId) : [...ids, applicationId]);
-  }
-
-  toggleAllVisibleApplications(): void {
-    const visibleIds = this.filteredApplications().map(application => application.id);
-    if (this.allVisibleApplicationsSelected()) {
-      this.selectedApplicationIds.update(ids => ids.filter(id => !visibleIds.includes(id)));
-    } else {
-      this.selectedApplicationIds.update(ids => Array.from(new Set([...ids, ...visibleIds])));
-    }
-  }
-
-  clearApplicationSelection(): void { this.selectedApplicationIds.set([]); }
-
   loadFilteredApplications(): void {
     const companyFilter = this.companyFilter();
     const selectedCompany = typeof companyFilter === 'number' ? companyFilter : undefined;
-    const applicationStatuses: ApplicationStatus[] = ['APPLIED', 'SHORTLISTED', 'SELECTED', 'REJECTED', 'WITHDRAWN'];
+    const applicationStatuses: ApplicationStatus[] = ['APPLIED', 'SHORTLISTED', 'APPLICATION_REJECTED', 'SELECTED', 'REJECTED', 'WITHDRAWN'];
     const selectedStatus = this.statusFilter();
     const status = applicationStatuses.includes(selectedStatus as ApplicationStatus)
       ? selectedStatus as ApplicationStatus
@@ -333,34 +319,15 @@ export class StaffDashboardComponent implements OnInit {
     });
   }
 
-  setApplicationOutcome(application: StaffApplication, outcome: 'SELECTED' | 'REJECTED'): void {
-    if (!confirm(`${outcome === 'SELECTED' ? 'Select' : 'Reject'} ${application.studentName}'s application?`)) return;
+  rejectApplication(application: StaffApplication): void {
+    if (!confirm(`Reject ${application.studentName}'s application for ${application.companyName}?`)) return;
     this.startSave();
-    this.placementService.setFinalOutcome(application.driveId, application.id, outcome).subscribe({
+    this.placementService.rejectApplication(application.driveId, application.id).subscribe({
       next: updated => {
         this.applications.update(items => items.map(item => item.id === updated.id ? { ...item, status: updated.status } : item));
-        this.candidates.update(items => items.map(item => item.applicationId === updated.id ? { ...item, applicationStatus: updated.status, result: outcome === 'SELECTED' ? 'PASSED' : 'FAILED' } : item));
-        this.finishSave(`Application marked ${outcome === 'SELECTED' ? 'selected' : 'not selected'}.`);
+        this.finishSave('Application rejected. It will not enter upcoming rounds.');
       },
-      error: error => this.failSave(error.error?.detail ?? error.error?.message
-        ?? 'The drive must not be cancelled, the final round must be published, and the student must have passed all previous rounds before recording an outcome.')
-    });
-  }
-
-  bulkApplicationOutcome(outcome: 'SELECTED' | 'REJECTED'): void {
-    const ids = this.selectedApplicationIds();
-    if (!ids.length || !confirm(`${outcome === 'SELECTED' ? 'Select' : 'Reject'} ${ids.length} application(s)?`)) return;
-    const selected = this.applications().filter(application => ids.includes(application.id));
-    this.startSave();
-    forkJoin(selected.map(application => this.placementService.setFinalOutcome(application.driveId, application.id, outcome))).subscribe({
-      next: updated => {
-        const updatedById = new Map(updated.map(application => [application.id, application.status]));
-        this.applications.update(items => items.map(item => updatedById.has(item.id) ? { ...item, status: updatedById.get(item.id)! } : item));
-        this.candidates.update(items => items.map(item => updatedById.has(item.applicationId) ? { ...item, applicationStatus: updatedById.get(item.applicationId)!, result: outcome === 'SELECTED' ? 'PASSED' : 'FAILED' } : item));
-        this.clearApplicationSelection();
-        this.finishSave(`${updated.length} application(s) updated.`);
-      },
-      error: error => this.failSave(error.error?.detail ?? error.error?.message ?? 'One or more applications could not be updated. Confirm the final-round rules for the selected students.')
+      error: error => this.failSave(this.apiError(error, 'The application could not be rejected.'))
     });
   }
 

@@ -49,7 +49,7 @@ export interface PlacementDrive {
   eligibleProgramCodes: string[];
 }
 
-export type ApplicationStatus = 'APPLIED' | 'SHORTLISTED' | 'REJECTED' | 'SELECTED' | 'WITHDRAWN';
+export type ApplicationStatus = 'APPLIED' | 'SHORTLISTED' | 'APPLICATION_REJECTED' | 'REJECTED' | 'SELECTED' | 'WITHDRAWN';
 
 export interface StaffApplication {
   id: number;

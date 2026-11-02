@@ -271,6 +271,26 @@ class RecruitmentServiceTest {
     }
 
     @Test
+    void rejectsFinalOutcomeForApplicationRejectedByStaff() {
+        RecruitmentRound finalRound = mock(RecruitmentRound.class);
+        PlacementApplication application = mock(PlacementApplication.class);
+        when(finalRound.getId()).thenReturn(11L);
+        when(finalRound.isFinalRound()).thenReturn(true);
+        when(finalRound.isResultsPublished()).thenReturn(true);
+        when(application.getDrive()).thenReturn(drive);
+        when(application.getStatus()).thenReturn(ApplicationStatus.APPLICATION_REJECTED);
+        when(rounds.findAllByDrive_IdOrderByOrderAsc(7L)).thenReturn(List.of(finalRound));
+        when(applications.findById(22L)).thenReturn(Optional.of(application));
+
+        ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                () -> service.setFinalOutcome(authentication, 7L, 22L,
+                        new FinalOutcomeRequest(ApplicationStatus.SELECTED)));
+
+        assertEquals(HttpStatus.BAD_REQUEST, error.getStatusCode());
+        assertEquals("Application-rejected records cannot receive final outcomes", error.getReason());
+    }
+
+    @Test
     void candidateListIncludesApplicationStatusAndSynthesizedFinalResult() {
         RecruitmentRound finalRound = mock(RecruitmentRound.class);
         PlacementApplication application = mock(PlacementApplication.class);
@@ -297,5 +317,22 @@ class RecruitmentServiceTest {
         assertEquals(1, candidates.size());
         assertEquals(ApplicationStatus.SELECTED, candidates.get(0).applicationStatus());
         assertEquals(RoundResultStatus.PASSED, candidates.get(0).result());
+    }
+
+    @Test
+    void applicationRejectedByStaffDoesNotEnterRoundCandidates() {
+        RecruitmentRound firstRound = mock(RecruitmentRound.class);
+        PlacementApplication application = mock(PlacementApplication.class);
+        when(firstRound.getId()).thenReturn(11L);
+        when(firstRound.getOrder()).thenReturn(1);
+        when(firstRound.isFinalRound()).thenReturn(false);
+        when(rounds.findByIdAndDrive_Id(11L, 7L)).thenReturn(Optional.of(firstRound));
+        when(rounds.findAllByDrive_IdOrderByOrderAsc(7L)).thenReturn(List.of(firstRound));
+        when(application.getStatus()).thenReturn(ApplicationStatus.APPLICATION_REJECTED);
+        when(applications.findAllByDrive_IdOrderByAppliedAtAsc(7L)).thenReturn(List.of(application));
+
+        var candidates = service.listCandidates(authentication, 7L, 11L);
+
+        assertEquals(0, candidates.size());
     }
 }
