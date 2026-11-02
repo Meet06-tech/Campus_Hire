@@ -86,6 +86,35 @@ public class PlacementService {
         return result.stream().map(this::drive).toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<DriveResponse> listRoundManagementDrives(Authentication auth) {
+        return listStaffDrives(auth).stream()
+                .filter(drive -> drive.status() != DriveStatus.CANCELLED)
+                .toList();
+    }
+
+    @Transactional
+    public ApplicationResponse rejectApplication(Authentication auth, Long driveId, Long applicationId) {
+        UserAccount user = authorization.staff(auth);
+        PlacementDrive drive = drives.findById(driveId).orElseThrow(() -> notFound("Placement drive"));
+        if (user.getRole() == UserRole.DTPO) {
+            Department department = requireDepartment(user);
+            if (drive.getDepartment() == null || !department.getId().equals(drive.getDepartment().getId()))
+                throw forbidden("Drive is outside your department");
+        }
+        PlacementApplication application = applications.findById(applicationId)
+                .orElseThrow(() -> notFound("Application"));
+        if (!Objects.equals(application.getDrive().getId(), driveId)) throw notFound("Application");
+        if (application.getStatus() == ApplicationStatus.APPLICATION_REJECTED)
+            throw conflict("Application is already rejected");
+        if (application.getStatus() == ApplicationStatus.SELECTED
+                || application.getStatus() == ApplicationStatus.REJECTED
+                || application.getStatus() == ApplicationStatus.WITHDRAWN)
+            throw bad("Only active applications can be rejected");
+        application.setStatus(ApplicationStatus.APPLICATION_REJECTED);
+        return application(applications.save(application));
+    }
+
     @Transactional
     public DriveResponse cancelDrive(Authentication auth, Long driveId) {
         UserAccount user = authorization.staff(auth);
