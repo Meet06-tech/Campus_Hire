@@ -8,14 +8,50 @@ import com.placementmanagement.api.placement.entity.*;
 
 public final class PlacementDtos {
     private PlacementDtos() {}
-    public record CompanyRequest(String name, String description, String website, String hrContactName, String hrContactEmail, String hrContactPhone) {}
-    public record CompanyResponse(Long id, String name, String description, String website, String hrContactName, String hrContactEmail, String hrContactPhone) {}
+    public record CompanyRequest(String name, String description, String website, String hrContactName, String hrContactEmail, String hrContactPhone,
+            String employmentType, String positionType, String defaultLocation, BigDecimal ctcAmount, String ctcCurrency,
+            String stipendType, BigDecimal stipendMinAmount, BigDecimal stipendMaxAmount, String stipendCurrency,
+            String stipendPaymentPeriod, String otherBenefits, String bondDetails, String stipend) {
+        public CompanyRequest(String name, String description, String website, String hrContactName, String hrContactEmail, String hrContactPhone) {
+            this(name, description, website, hrContactName, hrContactEmail, hrContactPhone, null, null, null, null, null, null, null, null, null, null, null, null, null);
+        }
+    }
+    public record CompanyResponse(Long id, String name, String description, String website, String hrContactName, String hrContactEmail, String hrContactPhone,
+            String employmentType, String positionType, String defaultLocation, BigDecimal ctcAmount, String ctcCurrency, String stipendType,
+            BigDecimal stipendMinAmount, BigDecimal stipendMaxAmount, String stipendCurrency, String stipendPaymentPeriod, String otherBenefits, String bondDetails, String stipend) {
+        public CompanyResponse(Long id, String name, String description, String website, String hrContactName, String hrContactEmail, String hrContactPhone) {
+            this(id, name, description, website, hrContactName, hrContactEmail, hrContactPhone, null, null, null, null, null, null, null, null, null, null, null, null, null);
+        }
+    }
+    public record AttachmentResponse(Long id, String fileName, String contentType, long sizeBytes) {}
     public record DriveRequest(Long companyId, Long departmentId, String title, String jobDescription, String jobType,
             String location, String packageSalary, Instant applicationDeadline, BigDecimal minimumCgpa,
-            Short graduationYear, Integer maximumActiveBacklogs, List<Long> eligibleProgramIds) {}
+            Short graduationYear, Integer maximumActiveBacklogs, List<Long> eligibleProgramIds,
+            String employmentType, String positionType, BigDecimal ctcAmount, String ctcCurrency,
+            String stipendType, BigDecimal stipendMinAmount, BigDecimal stipendMaxAmount, String stipendCurrency,
+            String stipendPaymentPeriod, String otherBenefits, String bondDetails, String stipend) {
+        public DriveRequest(Long companyId, Long departmentId, String title, String jobDescription, String jobType,
+                String location, String packageSalary, Instant applicationDeadline, BigDecimal minimumCgpa,
+                Short graduationYear, Integer maximumActiveBacklogs, List<Long> eligibleProgramIds) {
+            this(companyId, departmentId, title, jobDescription, jobType, location, packageSalary, applicationDeadline,
+                    minimumCgpa, graduationYear, maximumActiveBacklogs, eligibleProgramIds, null, null, null, null,
+                    null, null, null, null, null, null, null, null);
+        }
+    }
     public record DriveResponse(Long id, CompanyResponse company, Long departmentId, String title, String jobDescription,
             String jobType, String location, String packageSalary, Instant applicationDeadline, DriveStatus status,
-            BigDecimal minimumCgpa, Short graduationYear, Integer maximumActiveBacklogs, List<String> eligibleProgramCodes) {}
+            BigDecimal minimumCgpa, Short graduationYear, Integer maximumActiveBacklogs, List<String> eligibleProgramCodes,
+            String employmentType, String positionType, BigDecimal ctcAmount, String ctcCurrency, String stipendType,
+            BigDecimal stipendMinAmount, BigDecimal stipendMaxAmount, String stipendCurrency, String stipendPaymentPeriod,
+            String otherBenefits, String bondDetails, String stipend) {
+        public DriveResponse(Long id, CompanyResponse company, Long departmentId, String title, String jobDescription,
+                String jobType, String location, String packageSalary, Instant applicationDeadline, DriveStatus status,
+                BigDecimal minimumCgpa, Short graduationYear, Integer maximumActiveBacklogs, List<String> eligibleProgramCodes) {
+            this(id, company, departmentId, title, jobDescription, jobType, location, packageSalary, applicationDeadline, status,
+                    minimumCgpa, graduationYear, maximumActiveBacklogs, eligibleProgramCodes, null, null, null, null, null,
+                    null, null, null, null, null, null, null);
+        }
+    }
     public record ApplicationResponse(Long id, Long driveId, Long studentId, Instant appliedAt, ApplicationStatus status,
             OfferStatus offerStatus, Instant offerDecidedAt) {
         public ApplicationResponse(Long id, Long driveId, Long studentId, Instant appliedAt, ApplicationStatus status) {

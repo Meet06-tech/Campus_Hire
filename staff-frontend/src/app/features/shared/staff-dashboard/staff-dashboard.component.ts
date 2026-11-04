@@ -1,12 +1,12 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { forkJoin, of } from 'rxjs';
+import { finalize, forkJoin, of } from 'rxjs';
 
 import { AuthService } from '../../../core/services/auth.service';
 import { PlacementService } from '../../../core/services/placement.service';
 import { MeResponse, StaffRole } from '../../../core/models/auth.models';
-import { ApplicationStatus, Company, CompanyRequest, Coordinator, CoordinatorRequest, DashboardSummary, DepartmentInfo, DriveRequest, PlacementDrive, RecruitmentRound, RoundCandidate, RoundRequest, StaffApplication, StaffStudent } from '../../../core/models/placement.models';
+import { ApplicationStatus, Company, CompanyRequest, Coordinator, CoordinatorRequest, DashboardSummary, DepartmentInfo, DriveRequest, PlacementAttachment, PlacementDrive, RecruitmentRound, RoundCandidate, RoundRequest, StaffApplication, StaffStudent } from '../../../core/models/placement.models';
 
 type DashboardSection = 'overview' | 'drives' | 'companies' | 'applications' | 'students' | 'reports' | 'coordinators' | 'rounds';
 
@@ -68,16 +68,33 @@ export class StaffDashboardComponent implements OnInit {
   companyFilter = signal<number | 'ALL'>('ALL');
   minCgpaFilter = signal<number | null>(null);
   maxCgpaFilter = signal<number | null>(null);
+  applicationSearch = signal('');
+  reportDownloading = signal<string | null>(null);
+  reportDepartmentId = signal<number | null>(null);
 
   companyForm: CompanyRequest = this.emptyCompany();
   driveForm: DriveRequest = this.emptyDrive();
   coordinatorForm: CoordinatorRequest = this.emptyCoordinator();
   roundForm: RoundRequest = { name: '', order: 1, finalRound: false };
+  attachmentFiles: File[] = [];
+  companyAttachmentFiles: File[] = [];
+  selectedCompanyAttachments: PlacementAttachment[] = [];
+  editingCompanyId: number | null = null;
 
   get navItems(): DashboardNavItem[] {
     return this.role === 'UTPO'
       ? [...this.baseNavItems, { id: 'coordinators', label: 'Department coordinators', icon: '♙' }]
       : [...this.baseNavItems, { id: 'rounds', label: 'Round management', icon: '◉' }];
+  }
+  get selectedCompany(): Company | null {
+    return this.companies().find(company => company.id === this.driveForm.companyId) ?? null;
+  }
+  selectCompany(companyId: number): void {
+    this.driveForm.companyId = companyId;
+    const company = this.companies().find(item => item.id === companyId);
+    if (!company) { this.selectedCompanyAttachments = []; return; }
+    this.driveForm = { ...this.driveForm, title: company.name, location: company.defaultLocation ?? '', employmentType: company.employmentType ?? '', positionType: company.positionType ?? '', ctcAmount: company.ctcAmount ?? null, ctcCurrency: company.ctcCurrency ?? 'INR', stipend: company.stipend ?? '', jobDescription: company.description ?? '', otherBenefits: company.otherBenefits ?? '', bondDetails: company.bondDetails ?? '' };
+    this.placementService.listCompanyAttachments(companyId).subscribe({ next: files => this.selectedCompanyAttachments = files, error: error => this.errorMessage.set(this.apiError(error, 'Company details loaded, but attachments could not be loaded.')) });
   }
 
   constructor(private authService: AuthService, private placementService: PlacementService) {}
@@ -172,7 +189,7 @@ export class StaffDashboardComponent implements OnInit {
     const status = applicationStatuses.includes(selectedStatus as ApplicationStatus)
       ? selectedStatus as ApplicationStatus
       : '';
-    this.placementService.listApplications(0, 100, '', status, selectedCompany, this.minCgpaFilter() ?? undefined, this.maxCgpaFilter() ?? undefined).subscribe({
+    this.placementService.listApplications(0, 100, this.applicationSearch(), status, selectedCompany, this.minCgpaFilter() ?? undefined, this.maxCgpaFilter() ?? undefined).subscribe({
       next: page => this.applications.set(page.items),
       error: error => {
         if (error.status === 401) this.authService.logout();
@@ -200,6 +217,29 @@ export class StaffDashboardComponent implements OnInit {
     this.maxCgpaFilter.set(value === '' ? null : Number(value));
     this.loadFilteredApplications();
   }
+  onApplicationSearchChange(value: string): void { this.applicationSearch.set(value); this.loadFilteredApplications(); }
+  resetApplicationSearch(): void { this.applicationSearch.set(''); this.loadFilteredApplications(); }
+
+  archiveDrive(drive: PlacementDrive): void {
+    if (!confirm(`Remove ${drive.title} from operational lists? Its ${drive.status.toLowerCase()} history will be preserved.`)) return;
+    this.startSave();
+    this.placementService.archiveDrive(drive.id).subscribe({
+      next: archived => { this.drives.update(items => items.filter(item => item.id !== archived.id)); this.finishSave('Drive archived from operational lists. History was preserved.'); },
+      error: error => this.failSave(this.apiError(error, 'Only cancelled or completed drives can be archived.'))
+    });
+  }
+
+  downloadReport(path: string, departmentId?: number): void {
+    if (this.reportDownloading()) return;
+    this.reportDownloading.set(path);
+    this.errorMessage.set(null);
+    this.placementService.downloadReport(path, departmentId).pipe(finalize(() => this.reportDownloading.set(null))).subscribe({
+      next: blob => { const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = path; anchor.click(); URL.revokeObjectURL(url); },
+      error: error => this.errorMessage.set(this.apiError(error, 'The report could not be downloaded.')),
+      complete: () => this.successMessage.set(`${path.endsWith('.xlsx') ? 'Excel' : 'CSV'} report downloaded.`)
+    });
+  }
+  parseDepartmentId(value: string): number | undefined { return value ? Number(value) : undefined; }
 
   submitCompany(): void {
     if (!this.companyForm.name.trim()) {
@@ -207,19 +247,30 @@ export class StaffDashboardComponent implements OnInit {
       return;
     }
     this.startSave();
-    this.placementService.createCompany(this.companyForm).subscribe({
+    const request = this.editingCompanyId ? this.placementService.updateCompany(this.editingCompanyId, this.companyForm) : this.placementService.createCompany(this.companyForm);
+    request.subscribe({
       next: company => {
-        this.companies.update(items => [...items, company]);
+        this.companies.update(items => this.editingCompanyId ? items.map(item => item.id === company.id ? company : item) : [...items, company]);
+        const uploads = this.companyAttachmentFiles.map(file => this.placementService.uploadCompanyAttachment(company.id, file));
+        if (uploads.length) forkJoin(uploads).subscribe({ error: error => this.errorMessage.set(this.apiError(error, 'Company saved, but an attachment could not be uploaded.')) });
+        this.companyAttachmentFiles = [];
         this.companyForm = this.emptyCompany();
         this.showCompanyForm.set(false);
-        this.finishSave('Company created successfully.');
+        this.editingCompanyId = null;
+        this.finishSave('Company saved successfully.');
       },
       error: error => this.failSave(this.apiError(error, 'Company could not be created. Check the details and try again.'))
     });
   }
+  editCompany(company: Company): void {
+    this.editingCompanyId = company.id;
+    this.companyForm = { name: company.name, description: company.description ?? '', website: company.website ?? '', hrContactName: company.hrContactName ?? '', hrContactEmail: company.hrContactEmail ?? '', hrContactPhone: company.hrContactPhone ?? '', employmentType: company.employmentType ?? '', positionType: company.positionType ?? '', defaultLocation: company.defaultLocation ?? '', ctcAmount: company.ctcAmount ?? null, ctcCurrency: company.ctcCurrency ?? 'INR', stipend: company.stipend ?? '', otherBenefits: company.otherBenefits ?? '', bondDetails: company.bondDetails ?? '' };
+    this.placementService.listCompanyAttachments(company.id).subscribe({ next: files => this.selectedCompanyAttachments = files, error: () => this.selectedCompanyAttachments = [] });
+    this.showCompanyForm.set(true);
+  }
 
   submitDrive(): void {
-    if (!this.driveForm.companyId || !this.driveForm.title.trim() || !this.driveForm.applicationDeadline || !this.driveForm.jobDescription.trim() || !this.driveForm.location.trim() || !this.driveForm.packageSalary.trim()) {
+    if (!this.driveForm.companyId || !this.driveForm.title.trim() || !this.driveForm.applicationDeadline || !this.driveForm.jobDescription.trim() || !this.driveForm.location.trim() || this.driveForm.ctcAmount == null || !this.driveForm.ctcCurrency?.trim()) {
       this.errorMessage.set('Complete the required drive fields before saving.');
       return;
     }
@@ -233,12 +284,23 @@ export class StaffDashboardComponent implements OnInit {
     this.placementService.createDrive(request).subscribe({
       next: drive => {
         this.drives.update(items => [...items, drive]);
+        const uploads = this.attachmentFiles.map(file => this.placementService.uploadAttachment(drive.id, file));
+        if (uploads.length) forkJoin(uploads).subscribe({ error: error => this.errorMessage.set(this.apiError(error, 'The drive was saved, but an attachment could not be uploaded.')) });
+        this.attachmentFiles = [];
         this.driveForm = this.emptyDrive();
         this.showDriveForm.set(false);
         this.finishSave('Placement drive created as a draft.');
       },
       error: error => this.failSave(this.apiError(error, 'Placement drive could not be created. Confirm the active academic year and required fields.'))
     });
+  }
+  onAttachmentFilesSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    this.attachmentFiles = input.files ? Array.from(input.files) : [];
+  }
+  onCompanyFilesSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    this.companyAttachmentFiles = input.files ? Array.from(input.files) : [];
   }
 
   publishDrive(drive: PlacementDrive): void {
@@ -261,6 +323,15 @@ export class StaffDashboardComponent implements OnInit {
         this.finishSave('Placement drive cancelled. Existing application history was preserved.');
       },
       error: error => this.failSave(this.apiError(error, 'This drive could not be cancelled. Only draft or published drives can be cancelled.'))
+    });
+  }
+
+  completeDrive(drive: PlacementDrive): void {
+    if (!confirm(`Complete ${drive.title}? Recruitment activity must already be finished.`)) return;
+    this.startSave();
+    this.placementService.completeDrive(drive.id).subscribe({
+      next: completed => { this.drives.update(items => items.map(item => item.id === completed.id ? completed : item)); this.finishSave('Placement drive completed. History was preserved.'); },
+      error: error => this.failSave(this.apiError(error, 'This drive cannot be completed until all recruitment rounds are finished.'))
     });
   }
 
@@ -361,8 +432,8 @@ export class StaffDashboardComponent implements OnInit {
   private apiError(error: { error?: { detail?: string; message?: string }; message?: string }, fallback: string): string {
     return error.error?.detail ?? error.error?.message ?? error.message ?? fallback;
   }
-  private emptyCompany(): CompanyRequest { return { name: '', description: '', website: '', hrContactName: '', hrContactEmail: '', hrContactPhone: '' }; }
-  private emptyDrive(): DriveRequest { return { companyId: 0, departmentId: null, title: '', jobDescription: '', jobType: 'ONSITE', location: '', packageSalary: '', applicationDeadline: '', minimumCgpa: null, graduationYear: null, maximumActiveBacklogs: null, eligibleProgramIds: [] }; }
+  private emptyCompany(): CompanyRequest { return { name: '', description: '', website: '', hrContactName: '', hrContactEmail: '', hrContactPhone: '', employmentType: '', positionType: '', defaultLocation: '', ctcAmount: null, ctcCurrency: 'INR', stipend: '', otherBenefits: '', bondDetails: '' }; }
+  private emptyDrive(): DriveRequest { return { companyId: 0, departmentId: null, title: '', jobDescription: '', jobType: 'ONSITE', location: '', applicationDeadline: '', minimumCgpa: null, graduationYear: null, maximumActiveBacklogs: null, eligibleProgramIds: [], employmentType: '', positionType: '', ctcAmount: null, ctcCurrency: 'INR', stipend: '', otherBenefits: '', bondDetails: '' }; }
   private emptyCoordinator(): CoordinatorRequest { return { fullName: '', universityEmail: '', departmentId: null, initialPassword: '' }; }
   logout(): void { this.authService.logout(); }
 }

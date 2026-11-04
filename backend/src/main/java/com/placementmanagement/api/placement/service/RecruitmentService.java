@@ -103,6 +103,14 @@ public class RecruitmentService {
         UserAccount recorder = authorization.staff(auth);
         result.update(request.result(), recorder);
         result = results.save(result);
+        if (request.result() == RoundResultStatus.FAILED
+                && application.getStatus() != ApplicationStatus.APPLICATION_REJECTED
+                && application.getStatus() != ApplicationStatus.SELECTED
+                && application.getStatus() != ApplicationStatus.REJECTED
+                && application.getStatus() != ApplicationStatus.WITHDRAWN) {
+            application.setStatus(ApplicationStatus.REJECTED);
+            applications.save(application);
+        }
         return new RoundResultResponse(roundId, applicationId, result.getResult(), result.getRecordedAt());
     }
 
@@ -134,6 +142,8 @@ public class RecruitmentService {
             throw bad("Application-rejected records cannot receive final outcomes");
         if (!passedAllPreviousRounds(application, drive, finalRound))
             throw bad("Only a student who passed all previous rounds can receive an outcome");
+        if (request.outcome() == ApplicationStatus.SELECTED && application.getStatus() != ApplicationStatus.SELECTED)
+            application.markSelected();
         application.setStatus(request.outcome());
         applications.save(application);
         RoundResult finalResult = results.findByRound_IdAndApplication_Id(finalRound.getId(), application.getId())
@@ -169,7 +179,8 @@ public class RecruitmentService {
         List<StudentRoundProgress> progress = rounds.findAllByDrive_IdOrderByOrderAsc(application.getDrive().getId()).stream()
                 .map(round -> {
                     Optional<RoundResult> result = results.findByRound_IdAndApplication_Id(round.getId(), application.getId());
-                    String status = !round.isResultsPublished() ? "UPCOMING"
+                    String status = hasFailedEarlier(application, round) ? "NOT_APPLICABLE"
+                            : !round.isResultsPublished() ? "UPCOMING"
                             : result.map(value -> switch (value.getResult()) {
                                 case PASSED -> "CLEARED";
                                 case FAILED -> "NOT_CLEARED";
@@ -191,7 +202,8 @@ public class RecruitmentService {
     private List<PlacementApplication> candidateApplications(RecruitmentRound round, PlacementDrive drive) {
         return applications.findAllByDrive_IdOrderByAppliedAtAsc(drive.getId()).stream()
                 .filter(application -> application.getStatus() != ApplicationStatus.WITHDRAWN
-                        && application.getStatus() != ApplicationStatus.APPLICATION_REJECTED)
+                        && application.getStatus() != ApplicationStatus.APPLICATION_REJECTED
+                        && application.getStatus() != ApplicationStatus.REJECTED)
                 .filter(application -> round.getOrder() == 1 || (round.isFinalRound()
                         ? passedAllPreviousRounds(application, drive, round)
                         : passedPreviousRound(application, drive, round)))
@@ -212,6 +224,12 @@ public class RecruitmentService {
                 .findFirst()
                 .flatMap(round -> results.findByRound_IdAndApplication_Id(round.getId(), application.getId()))
                 .map(result -> result.getResult() == RoundResultStatus.PASSED).orElse(false);
+    }
+
+    private boolean hasFailedEarlier(PlacementApplication application, RecruitmentRound current) {
+        return results.findAllByApplication_IdOrderByRound_OrderAsc(application.getId()).stream()
+                .anyMatch(value -> value.getRound().getOrder() < current.getOrder()
+                        && value.getResult() == RoundResultStatus.FAILED);
     }
 
     private CandidateResponse candidate(RecruitmentRound round, PlacementApplication application) {
@@ -243,7 +261,7 @@ public class RecruitmentService {
     private PlacementDrive managedDrive(Authentication auth, Long driveId) {
         UserAccount user = authorization.staff(auth);
         PlacementDrive drive = drives.findById(driveId).orElseThrow(() -> notFound("Placement drive"));
-        if (drive.getStatus() == DriveStatus.CANCELLED)
+        if (drive.getStatus() == DriveStatus.CANCELLED || drive.getStatus() == DriveStatus.COMPLETED)
             throw bad("Cancelled drives are not available for round management");
         if (user.getRole() == UserRole.DTPO) {
             Department department = user.getDepartment();

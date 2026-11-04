@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import '../models/placement_models.dart';
+import '../models/placement_attachment.dart';
 import '../services/placement_api.dart';
 import 'profile_page.dart';
 import 'settings_page.dart';
@@ -346,6 +347,8 @@ class DriveDetailsPage extends StatefulWidget {
 
 class _DriveDetailsPageState extends State<DriveDetailsPage> {
   bool _applying = false;
+  bool _attachmentsLoading = true;
+  List<PlacementAttachment> _attachments = const [];
   String? _error;
 
   Future<void> _apply() async {
@@ -373,6 +376,12 @@ class _DriveDetailsPageState extends State<DriveDetailsPage> {
     } finally {
       if (mounted) setState(() => _applying = false);
     }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    widget.api.fetchDriveAttachments(widget.drive.id).then((items) { if (mounted) setState(() { _attachments = items; _attachmentsLoading = false; }); }).catchError((_) { if (mounted) setState(() => _attachmentsLoading = false); });
   }
 
   @override
@@ -406,7 +415,7 @@ class _DriveDetailsPageState extends State<DriveDetailsPage> {
               children: [
                 _DetailTile(label: 'Job type', value: drive.jobType),
                 _DetailTile(label: 'Location', value: drive.location),
-                _DetailTile(label: 'Package', value: drive.packageSalary),
+                _DetailTile(label: 'CTC', value: _money(drive.ctcAmount, drive.ctcCurrency)),
                 _DetailTile(
                   label: 'Deadline',
                   value: _formatDate(drive.applicationDeadline),
@@ -414,6 +423,27 @@ class _DriveDetailsPageState extends State<DriveDetailsPage> {
               ],
             ),
           ),
+          if (_hasOptionalDetails(drive))
+            _DetailsCard(
+              title: 'Opportunity details',
+              icon: Icons.payments_outlined,
+              child: Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  _DetailTile(label: 'Employment', value: drive.employmentType),
+                  _DetailTile(label: 'Position', value: drive.positionType),
+                  _DetailTile(label: 'CTC', value: _money(drive.ctcAmount, drive.ctcCurrency)),
+                  _DetailTile(label: 'Stipend', value: drive.stipend),
+                ],
+              ),
+            ),
+          if (drive.otherBenefits?.trim().isNotEmpty == true)
+            _DetailsCard(title: 'Other benefits', icon: Icons.card_giftcard_outlined, child: Text(drive.otherBenefits!)),
+          if (drive.bondDetails?.trim().isNotEmpty == true)
+            _DetailsCard(title: 'Bond details', icon: Icons.description_outlined, child: Text(drive.bondDetails!)),
+          if (!_attachmentsLoading && _attachments.isNotEmpty)
+            _DetailsCard(title: 'Attachments', icon: Icons.attach_file, child: Column(children: _attachments.map((file) => ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.insert_drive_file_outlined), title: Text(file.fileName), subtitle: Text(file.contentType), trailing: const Icon(Icons.download_outlined))).toList())),
           _DetailsCard(
             title: 'Eligibility',
             icon: Icons.verified_user_outlined,
@@ -492,6 +522,9 @@ class _DriveDetailsPageState extends State<DriveDetailsPage> {
       ),
     );
   }
+
+  bool _hasOptionalDetails(PlacementDrive drive) => [drive.employmentType, drive.positionType, drive.ctcAmount?.toString(), drive.stipend].any((value) => value?.trim().isNotEmpty == true);
+  String? _money(double? amount, String? currency) => amount == null ? null : '${currency ?? ''} ${amount.toStringAsFixed(2)}'.trim();
 }
 
 class ApplicationsTab extends StatefulWidget {
@@ -845,10 +878,10 @@ class _DriveCard extends StatelessWidget {
                       icon: Icons.location_on_outlined,
                       text: drive.location!,
                     ),
-                  if (drive.packageSalary?.isNotEmpty == true)
+                  if (drive.ctcAmount != null)
                     _InfoPill(
                       icon: Icons.payments_outlined,
-                      text: drive.packageSalary!,
+                      text: '${drive.ctcCurrency ?? ''} ${drive.ctcAmount!.toStringAsFixed(2)}'.trim(),
                     ),
                 ],
               ),
@@ -1178,7 +1211,7 @@ class _RoundProgressRow extends StatelessWidget {
     final label = visible ? _roundStatusLabel(round.status) : 'Results pending';
     final color = visible && round.status == 'CLEARED'
         ? Colors.green.shade700
-        : visible && round.status == 'NOT_CLEARED'
+        : visible && (round.status == 'NOT_CLEARED' || round.status == 'NOT_APPLICABLE')
         ? colors.error
         : colors.onSurfaceVariant;
     return Padding(
@@ -1229,6 +1262,8 @@ String _roundStatusLabel(String status) {
       return 'Cleared';
     case 'NOT_CLEARED':
       return 'Not cleared';
+    case 'NOT_APPLICABLE':
+      return 'Eliminated';
     case 'AWAITING_RESULT':
       return 'Awaiting result';
     default:

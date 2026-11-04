@@ -9,6 +9,6 @@ public interface PlacementDriveRepository extends JpaRepository<PlacementDrive, 
     long countByStatus(DriveStatus status);
     long countByDepartment_Id(Long departmentId);
     long countByDepartment_IdAndStatus(Long departmentId, DriveStatus status);
-    @Query("select d from PlacementDrive d where d.status = :status and (d.department is null or d.department.id = :departmentId) order by d.applicationDeadline asc")
+    @Query("select d from PlacementDrive d where d.status = :status and d.operationallyArchived = false and (d.department is null or d.department.id = :departmentId) order by d.applicationDeadline asc")
     List<PlacementDrive> findVisiblePublished(DriveStatus status, Long departmentId);
 }

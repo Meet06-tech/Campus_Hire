@@ -39,7 +39,8 @@ public interface PlacementApplicationRepository extends JpaRepository<PlacementA
           and (cast(:search as String) is null or lower(u.fullName) like lower(concat('%', cast(:search as String), '%'))
                or lower(s.enrollmentNumber) like lower(concat('%', cast(:search as String), '%'))
                or lower(drive.title) like lower(concat('%', cast(:search as String), '%'))
-               or lower(c.name) like lower(concat('%', cast(:search as String), '%')))
+               or lower(c.name) like lower(concat('%', cast(:search as String), '%'))
+               or lower(u.universityEmail) like lower(concat('%', cast(:search as String), '%')))
         order by a.appliedAt desc
         """)
     Page<StaffApplicationProjection> findStaffApplications(@Param("departmentId") Long departmentId,
