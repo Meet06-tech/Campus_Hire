@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../models/student_profile.dart';
 import '../models/placement_models.dart';
+import '../models/placement_attachment.dart';
 
 class ApiException implements Exception {
   const ApiException(this.message, this.statusCode);
@@ -131,6 +132,12 @@ class PlacementApi {
               PlacementDrive.fromJson(Map<String, dynamic>.from(item as Map)),
         )
         .toList(growable: false);
+  }
+
+  Future<List<PlacementAttachment>> fetchDriveAttachments(int driveId) async {
+    final response = await _requestJson('GET', '/placement/drives/$driveId/attachments');
+    if (response is! List) throw const ApiException('Invalid attachments response', 200);
+    return response.map((item) => PlacementAttachment.fromJson(Map<String, dynamic>.from(item as Map))).toList(growable: false);
   }
 
   Future<PlacementApplication> applyToDrive(int driveId) async {

@@ -5,12 +5,14 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import java.util.List;
 
 import com.placementmanagement.api.auth.entity.Student;
 import com.placementmanagement.api.placement.dto.PlacementDtos.StaffStudentProjection;
 
 public interface StudentRepository extends JpaRepository<Student, Long> {
     long countByDepartment_Id(Long departmentId);
+    List<Student> findAllByDepartment_IdOrderByUser_FullNameAsc(Long departmentId);
 
     @Query("""
         select s.id as studentId, u.fullName as fullName, u.universityEmail as universityEmail,

@@ -47,6 +47,7 @@ import com.placementmanagement.api.placement.repository.CompanyRepository;
 import com.placementmanagement.api.placement.repository.PlacementApplicationRepository;
 import com.placementmanagement.api.placement.repository.PlacementDriveRepository;
 import com.placementmanagement.api.placement.repository.PlacementProgramRepository;
+import com.placementmanagement.api.placement.repository.RecruitmentRoundRepository;
 import com.placementmanagement.api.placement.service.PlacementAuthorizationService;
 import com.placementmanagement.api.placement.service.PlacementService;
 
@@ -60,13 +61,36 @@ class PlacementServiceTest {
     @Mock AcademicYearRepository academicYears;
     @Mock StudentRepository students;
     @Mock PlacementAuthorizationService authorization;
+    @Mock RecruitmentRoundRepository rounds;
     @Mock Authentication authentication;
     private PlacementService service;
 
     @BeforeEach
     void setUp() {
         service = new PlacementService(companies, programs, drives, applications, departments,
-                academicYears, students, authorization);
+                academicYears, students, authorization, rounds);
+    }
+
+    @Test
+    void staffCanCompletePublishedDriveAfterRoundResultsArePublished() {
+        UserAccount utpo = mock(UserAccount.class);
+        PlacementDrive drive = mock(PlacementDrive.class);
+        Company company = mock(Company.class);
+        when(authorization.staff(authentication)).thenReturn(utpo);
+        when(utpo.getRole()).thenReturn(UserRole.UTPO);
+        when(drives.findById(19L)).thenReturn(Optional.of(drive));
+        when(drive.getStatus()).thenReturn(DriveStatus.PUBLISHED, DriveStatus.COMPLETED);
+        when(drive.getId()).thenReturn(19L);
+        when(drive.getCompany()).thenReturn(company);
+        when(company.getId()).thenReturn(5L);
+        when(company.getName()).thenReturn("Acme");
+        when(drive.getPrograms()).thenReturn(Set.of());
+        when(rounds.findAllByDrive_IdOrderByOrderAsc(19L)).thenReturn(List.of());
+
+        DriveResponse response = service.completeDrive(authentication, 19L);
+
+        verify(drive).setStatus(DriveStatus.COMPLETED);
+        assertEquals(DriveStatus.COMPLETED, response.status());
     }
 
     @Test

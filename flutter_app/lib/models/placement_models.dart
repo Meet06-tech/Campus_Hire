@@ -46,6 +46,18 @@ class PlacementDrive {
     this.graduationYear,
     this.maximumActiveBacklogs,
     this.eligibleProgramCodes = const [],
+    this.employmentType,
+    this.positionType,
+    this.ctcAmount,
+    this.ctcCurrency,
+    this.stipendType,
+    this.stipendMinAmount,
+    this.stipendMaxAmount,
+    this.stipendCurrency,
+    this.stipendPaymentPeriod,
+    this.otherBenefits,
+    this.bondDetails,
+    this.stipend,
   });
 
   final int id;
@@ -62,6 +74,18 @@ class PlacementDrive {
   final int? graduationYear;
   final int? maximumActiveBacklogs;
   final List<String> eligibleProgramCodes;
+  final String? employmentType;
+  final String? positionType;
+  final double? ctcAmount;
+  final String? ctcCurrency;
+  final String? stipendType;
+  final double? stipendMinAmount;
+  final double? stipendMaxAmount;
+  final String? stipendCurrency;
+  final String? stipendPaymentPeriod;
+  final String? otherBenefits;
+  final String? bondDetails;
+  final String? stipend;
 
   factory PlacementDrive.fromJson(Map<String, dynamic> json) {
     final rawCompany = json['company'];
@@ -85,6 +109,18 @@ class PlacementDrive {
       eligibleProgramCodes: rawPrograms is List
           ? rawPrograms.map((value) => value.toString()).toList(growable: false)
           : const [],
+      employmentType: json['employmentType']?.toString(),
+      positionType: json['positionType']?.toString(),
+      ctcAmount: (json['ctcAmount'] as num?)?.toDouble(),
+      ctcCurrency: json['ctcCurrency']?.toString(),
+      stipendType: json['stipendType']?.toString(),
+      stipendMinAmount: (json['stipendMinAmount'] as num?)?.toDouble(),
+      stipendMaxAmount: (json['stipendMaxAmount'] as num?)?.toDouble(),
+      stipendCurrency: json['stipendCurrency']?.toString(),
+      stipendPaymentPeriod: json['stipendPaymentPeriod']?.toString(),
+      otherBenefits: json['otherBenefits']?.toString(),
+      bondDetails: json['bondDetails']?.toString(),
+      stipend: json['stipend']?.toString(),
     );
   }
 }
