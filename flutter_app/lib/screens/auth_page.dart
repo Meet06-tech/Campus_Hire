@@ -147,7 +147,8 @@ class _AuthPageState extends State<AuthPage> {
       body: SafeArea(
         child: Center(
           child: ScrollConfiguration(
-            behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+            behavior: ScrollConfiguration.of(context)
+                .copyWith(scrollbars: false),
             child: SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -163,7 +164,9 @@ class _AuthPageState extends State<AuthPage> {
                         child: Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                            color: isDark
+                                ? const Color(0xFF1E293B)
+                                : Colors.white,
                             borderRadius: BorderRadius.circular(22),
                             border: Border.all(
                               color: isDark
@@ -175,7 +178,8 @@ class _AuthPageState extends State<AuthPage> {
                               BoxShadow(
                                 color: isDark
                                     ? Colors.black26
-                                    : const Color(0xFF0F172A).withValues(alpha: 0.08),
+                                    : const Color(0xFF0F172A)
+                                          .withValues(alpha: 0.08),
                                 blurRadius: 16,
                                 offset: const Offset(0, 5),
                               ),
@@ -184,7 +188,7 @@ class _AuthPageState extends State<AuthPage> {
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(14),
                             child: Image.asset(
-                              'assets/images/cdpc_logo_square.jpg',
+                              'assets/images/cdpc_logo_square.png',
                               height: 80,
                               width: 80,
                               fit: BoxFit.cover,
@@ -228,9 +232,12 @@ class _AuthPageState extends State<AuthPage> {
                         transitionBuilder: (child, animation) =>
                             FadeTransition(opacity: animation, child: child),
                         child: Text(
-                          _registering ? 'Create student account' : 'Welcome back',
+                          _registering
+                              ? 'Create student account'
+                              : 'Welcome back',
                           key: ValueKey(_registering),
-                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          style: Theme.of(context).textTheme.headlineSmall
+                              ?.copyWith(
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: -0.3,
                               ),
@@ -255,7 +262,10 @@ class _AuthPageState extends State<AuthPage> {
                           textCapitalization: TextCapitalization.words,
                           decoration: const InputDecoration(
                             labelText: 'Full name',
-                            prefixIcon: Icon(Icons.person_outline_rounded, size: 20),
+                            prefixIcon: Icon(
+                              Icons.person_outline_rounded,
+                              size: 20,
+                            ),
                           ),
                           validator: (value) => _required(value, 'Full name'),
                         ),
@@ -289,7 +299,10 @@ class _AuthPageState extends State<AuthPage> {
                         obscureText: _obscurePassword,
                         decoration: InputDecoration(
                           labelText: 'Password',
-                          prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20),
+                          prefixIcon: const Icon(
+                            Icons.lock_outline_rounded,
+                            size: 20,
+                          ),
                           suffixIcon: IconButton(
                             icon: Icon(
                               _obscurePassword
@@ -302,7 +315,8 @@ class _AuthPageState extends State<AuthPage> {
                             ),
                           ),
                         ),
-                        validator: (value) => (value == null || value.length < 8)
+                        validator: (value) =>
+                            (value == null || value.length < 8)
                             ? 'Password must contain at least 8 characters'
                             : null,
                       ),
@@ -314,12 +328,15 @@ class _AuthPageState extends State<AuthPage> {
                           obscureText: _obscureConfirmPassword,
                           decoration: InputDecoration(
                             labelText: 'Confirm password',
-                            prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20),
+                            prefixIcon: const Icon(
+                              Icons.lock_outline_rounded,
+                              size: 20,
+                            ),
                             suffixIcon: IconButton(
                               icon: Icon(
                                 _obscureConfirmPassword
-                                  ? Icons.visibility_off_outlined
-                                  : Icons.visibility_outlined,
+                                    ? Icons.visibility_off_outlined
+                                    : Icons.visibility_outlined,
                                 size: 20,
                               ),
                               onPressed: () => setState(
@@ -353,9 +370,7 @@ class _AuthPageState extends State<AuthPage> {
                                   color: Colors.white,
                                 ),
                               )
-                            : Text(
-                                _registering ? 'Register' : 'Sign in',
-                              ),
+                            : Text(_registering ? 'Register' : 'Sign in'),
                       ),
                       const SizedBox(height: 12),
 

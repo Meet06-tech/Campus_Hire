@@ -162,49 +162,36 @@ class _CampusHireAppBar extends StatelessWidget implements PreferredSizeWidget {
     final colors = Theme.of(context).colorScheme;
 
     return AppBar(
-      titleSpacing: 16,
+      titleSpacing: 22,
       title: Row(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize: MainAxisSize.max,
         children: [
           // CHARUSAT Logo
           Image.asset(
             'assets/images/charusat_logo.png',
-            height: 32,
+            width: 180,
+            height: 42,
             fit: BoxFit.contain,
-            errorBuilder: (_, _, _) => Icon(
-              Icons.school_rounded,
-              color: colors.primary,
-              size: 26,
-            ),
+            errorBuilder: (_, _, _) =>
+                Icon(Icons.school_rounded, color: colors.primary, size: 26),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           Container(
             height: 20,
             width: 1,
             color: colors.outline.withValues(alpha: 0.5),
           ),
-          const SizedBox(width: 10),
-          // CDPC Square Logo (clearly visible and prominent)
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.asset(
-              'assets/images/cdpc_logo_square.jpg',
-              height: 36,
-              width: 36,
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => Icon(
-                Icons.work_outline_rounded,
-                size: 22,
-                color: colors.secondary,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          const Flexible(
-            child: Text(
-              'CDPC',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
-              overflow: TextOverflow.ellipsis,
+          const SizedBox(width: 12),
+          // CDPC Logo (exact same displayed width and height)
+          Image.asset(
+            'assets/images/cdpc_logo_rect.jpg',
+            width: 95,
+            height: 50,
+            fit: BoxFit.contain,
+            errorBuilder: (_, _, _) => Icon(
+              Icons.work_outline_rounded,
+              size: 24,
+              color: colors.secondary,
             ),
           ),
         ],
@@ -215,8 +202,9 @@ class _CampusHireAppBar extends StatelessWidget implements PreferredSizeWidget {
           icon: CircleAvatar(
             radius: 17,
             backgroundColor: colors.primaryContainer,
-            backgroundImage:
-                photoBytes == null ? null : MemoryImage(photoBytes!),
+            backgroundImage: photoBytes == null
+                ? null
+                : MemoryImage(photoBytes!),
             child: photoBytes == null
                 ? Icon(
                     Icons.person_outline_rounded,
@@ -458,16 +446,19 @@ class _DriveDetailsPageState extends State<DriveDetailsPage> {
   @override
   void initState() {
     super.initState();
-    widget.api.fetchDriveAttachments(widget.drive.id).then((items) {
-      if (mounted) {
-        setState(() {
-          _attachments = items;
-          _attachmentsLoading = false;
+    widget.api
+        .fetchDriveAttachments(widget.drive.id)
+        .then((items) {
+          if (mounted) {
+            setState(() {
+              _attachments = items;
+              _attachmentsLoading = false;
+            });
+          }
+        })
+        .catchError((_) {
+          if (mounted) setState(() => _attachmentsLoading = false);
         });
-      }
-    }).catchError((_) {
-      if (mounted) setState(() => _attachmentsLoading = false);
-    });
   }
 
   @override
@@ -523,7 +514,10 @@ class _DriveDetailsPageState extends State<DriveDetailsPage> {
                     spacing: 10,
                     runSpacing: 10,
                     children: [
-                      _DetailTile(label: 'Employment', value: drive.employmentType),
+                      _DetailTile(
+                        label: 'Employment',
+                        value: drive.employmentType,
+                      ),
                       _DetailTile(label: 'Position', value: drive.positionType),
                       _DetailTile(
                         label: 'CTC',
@@ -554,7 +548,9 @@ class _DriveDetailsPageState extends State<DriveDetailsPage> {
                         .map(
                           (file) => ListTile(
                             contentPadding: EdgeInsets.zero,
-                            leading: const Icon(Icons.insert_drive_file_outlined),
+                            leading: const Icon(
+                              Icons.insert_drive_file_outlined,
+                            ),
                             title: Text(file.fileName),
                             subtitle: Text(file.contentType),
                             trailing: const Icon(Icons.download_outlined),
@@ -574,11 +570,13 @@ class _DriveDetailsPageState extends State<DriveDetailsPage> {
                     ),
                     _EligibilityRow(
                       label: 'Graduation year',
-                      value: drive.graduationYear?.toString() ?? 'Not specified',
+                      value:
+                          drive.graduationYear?.toString() ?? 'Not specified',
                     ),
                     _EligibilityRow(
                       label: 'Active backlogs',
-                      value: drive.maximumActiveBacklogs?.toString() ??
+                      value:
+                          drive.maximumActiveBacklogs?.toString() ??
                           'Not specified',
                     ),
                     _EligibilityRow(
@@ -634,9 +632,7 @@ class _DriveDetailsPageState extends State<DriveDetailsPage> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .surfaceContainerHighest
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest
                         .withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(14),
                   ),
@@ -652,14 +648,15 @@ class _DriveDetailsPageState extends State<DriveDetailsPage> {
   }
 
   bool _hasOptionalDetails(PlacementDrive drive) => [
-        drive.employmentType,
-        drive.positionType,
-        drive.ctcAmount?.toString(),
-        drive.stipend,
-      ].any((value) => value?.trim().isNotEmpty == true);
+    drive.employmentType,
+    drive.positionType,
+    drive.ctcAmount?.toString(),
+    drive.stipend,
+  ].any((value) => value?.trim().isNotEmpty == true);
 
-  String? _money(double? amount, String? currency) =>
-      amount == null ? null : '${currency ?? ''} ${amount.toStringAsFixed(2)}'.trim();
+  String? _money(double? amount, String? currency) => amount == null
+      ? null
+      : '${currency ?? ''} ${amount.toStringAsFixed(2)}'.trim();
 }
 
 class ApplicationsTab extends StatefulWidget {
@@ -744,9 +741,8 @@ class _ApplicationsTabState extends State<ApplicationsTab> {
       if (error.statusCode == 401) {
         widget.onSessionExpired();
       } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error.message)),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.message)));
       }
     }
   }
@@ -781,9 +777,9 @@ class _ApplicationsTabState extends State<ApplicationsTab> {
                 child: Text(
                   widget.title,
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.2,
-                      ),
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.2,
+                  ),
                 ),
               ),
               ...visibleApplications.map(
@@ -814,13 +810,14 @@ class _HistoryApplicationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final selected = application.finalOutcome == 'SELECTED' ||
+    final selected =
+        application.finalOutcome == 'SELECTED' ||
         application.applicationStatus == 'SELECTED';
     final applicationRejected =
         application.applicationStatus == 'APPLICATION_REJECTED';
     final colors = Theme.of(context).colorScheme;
-    final normalizedOfferStatus =
-        (application.offerStatus ?? 'PENDING').toUpperCase();
+    final normalizedOfferStatus = (application.offerStatus ?? 'PENDING')
+        .toUpperCase();
     final offerPending = selected && normalizedOfferStatus == 'PENDING';
     final offerLabel = switch (normalizedOfferStatus) {
       'ACCEPTED' => 'Offer Accepted',
@@ -862,13 +859,13 @@ class _HistoryApplicationCard extends StatelessWidget {
               ),
               subtitle: Text(
                 'Applied ${_formatDate(application.appliedAt)}',
-                style: TextStyle(
-                  color: colors.onSurfaceVariant,
-                  fontSize: 12,
-                ),
+                style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
               ),
               trailing: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: selected
                       ? offerBadgeBackground
@@ -879,8 +876,8 @@ class _HistoryApplicationCard extends StatelessWidget {
                   selected
                       ? offerLabel
                       : applicationRejected
-                          ? 'Application Rejected'
-                          : 'Not Selected',
+                      ? 'Application Rejected'
+                      : 'Not Selected',
                   style: TextStyle(
                     color: selected ? offerBadgeText : colors.onErrorContainer,
                     fontWeight: FontWeight.w700,
@@ -1021,9 +1018,9 @@ class _DriveCard extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.2,
-                    ),
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.2,
+                ),
               ),
               const SizedBox(height: 12),
               Wrap(
@@ -1051,7 +1048,10 @@ class _DriveCard extends StatelessWidget {
               ),
               if (drive.applicationDeadline != null) ...[
                 const SizedBox(height: 14),
-                Divider(height: 1, color: colors.outline.withValues(alpha: 0.5)),
+                Divider(
+                  height: 1,
+                  color: colors.outline.withValues(alpha: 0.5),
+                ),
                 const SizedBox(height: 10),
                 Row(
                   children: [
@@ -1092,10 +1092,7 @@ class _DriveHero extends StatelessWidget {
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            colors.primary,
-            const Color(0xFF0284C7),
-          ],
+          colors: [colors.primary, const Color(0xFF0284C7)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -1218,9 +1215,7 @@ class _DetailTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: colors.primaryContainer.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: colors.primary.withValues(alpha: 0.15),
-        ),
+        border: Border.all(color: colors.primary.withValues(alpha: 0.15)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1411,10 +1406,10 @@ class _RoundProgressRow extends StatelessWidget {
     final color = visible && round.status == 'CLEARED'
         ? Colors.green.shade700
         : visible &&
-                (round.status == 'NOT_CLEARED' ||
-                    round.status == 'NOT_APPLICABLE')
-            ? colors.error
-            : colors.onSurfaceVariant;
+              (round.status == 'NOT_CLEARED' ||
+                  round.status == 'NOT_APPLICABLE')
+        ? colors.error
+        : colors.onSurfaceVariant;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -1521,9 +1516,7 @@ class _InfoPill extends StatelessWidget {
       decoration: BoxDecoration(
         color: colors.primaryContainer.withValues(alpha: 0.35),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: colors.primary.withValues(alpha: 0.15),
-        ),
+        border: Border.all(color: colors.primary.withValues(alpha: 0.15)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1560,10 +1553,7 @@ class _WelcomeCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 22),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            colors.primary,
-            const Color(0xFF0284C7),
-          ],
+          colors: [colors.primary, const Color(0xFF0284C7)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -1583,7 +1573,10 @@ class _WelcomeCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(20),
@@ -1690,9 +1683,8 @@ class _EmptyState extends StatelessWidget {
             const SizedBox(height: 18),
             Text(
               title,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
+              style: Theme.of(context).textTheme.titleLarge
+                  ?.copyWith(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 8),
             Text(
@@ -1715,24 +1707,24 @@ class _ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.error_outline_rounded,
-                size: 42,
-                color: Theme.of(context).colorScheme.error,
-              ),
-              const SizedBox(height: 12),
-              Text(message, textAlign: TextAlign.center),
-              const SizedBox(height: 16),
-              OutlinedButton(onPressed: onRetry, child: const Text('Try again')),
-            ],
+    child: Padding(
+      padding: const EdgeInsets.all(28),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.error_outline_rounded,
+            size: 42,
+            color: Theme.of(context).colorScheme.error,
           ),
-        ),
-      );
+          const SizedBox(height: 12),
+          Text(message, textAlign: TextAlign.center),
+          const SizedBox(height: 16),
+          OutlinedButton(onPressed: onRetry, child: const Text('Try again')),
+        ],
+      ),
+    ),
+  );
 }
 
 String _formatDate(DateTime? date) {
