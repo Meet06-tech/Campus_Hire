@@ -9,12 +9,19 @@ import 'package:placement_management_app/screens/student_home.dart';
 import 'package:placement_management_app/services/placement_api.dart';
 
 void main() {
-  testWidgets('shows the authentication screen', (WidgetTester tester) async {
+  testWidgets('shows the welcome and authentication screens', (WidgetTester tester) async {
     await tester.pumpWidget(const PlacementManagementApp());
 
-    expect(find.text('Placement Management System'), findsOneWidget);
+    expect(find.text('“चारुसैट है तो सक्सेस है”'), findsOneWidget);
+    expect(find.text('Discover placement opportunities at CHARUSAT.'), findsOneWidget);
     expect(find.text('Sign in'), findsOneWidget);
-    expect(find.text('New student? Create an account'), findsOneWidget);
+    expect(find.text('Create an account'), findsOneWidget);
+
+    await tester.tap(find.text('Sign in'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Placement Management System'), findsOneWidget);
+    expect(find.text('Welcome back'), findsOneWidget);
   });
 
   testWidgets('student shell switches between the three local destinations', (

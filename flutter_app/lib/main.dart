@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'navigation/app_navigation.dart';
-import 'screens/auth_page.dart';
+import 'screens/welcome_screen.dart';
 import 'services/placement_api.dart';
 import 'theme/app_theme.dart';
 
@@ -53,7 +53,7 @@ class _PlacementManagementAppState extends State<PlacementManagementApp> {
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
       themeMode: _themeMode,
-      home: AuthPage(
+      home: WelcomeScreen(
         api: widget.api ?? PlacementApi(),
         themeMode: _themeMode,
         onThemeModeChanged: _setThemeMode,

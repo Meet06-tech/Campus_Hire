@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../navigation/app_navigation.dart';
 import '../services/placement_api.dart';
 import 'student_home.dart';
+import 'welcome_screen.dart';
 
 class AuthPage extends StatefulWidget {
   const AuthPage({
@@ -10,11 +11,13 @@ class AuthPage extends StatefulWidget {
     required this.api,
     this.themeMode = ThemeMode.light,
     this.onThemeModeChanged,
+    this.initialRegistering = false,
   });
 
   final PlacementApi api;
   final ThemeMode themeMode;
   final ValueChanged<ThemeMode>? onThemeModeChanged;
+  final bool initialRegistering;
 
   @override
   State<AuthPage> createState() => _AuthPageState();
@@ -27,9 +30,15 @@ class _AuthPageState extends State<AuthPage> {
   final _password = TextEditingController();
   final _confirmPassword = TextEditingController();
   final _formKey = GlobalKey<FormState>();
-  bool _registering = false;
+  late bool _registering;
   bool _loading = false;
   String? _message;
+
+  @override
+  void initState() {
+    super.initState();
+    _registering = widget.initialRegistering;
+  }
 
   @override
   void dispose() {
@@ -88,7 +97,7 @@ class _AuthPageState extends State<AuthPage> {
     widget.api.clearToken();
     appNavigatorKey.currentState?.pushAndRemoveUntil(
       MaterialPageRoute(
-        builder: (_) => AuthPage(
+        builder: (_) => WelcomeScreen(
           api: widget.api,
           themeMode: widget.themeMode,
           onThemeModeChanged: widget.onThemeModeChanged,
