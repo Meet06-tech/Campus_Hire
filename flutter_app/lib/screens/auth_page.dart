@@ -186,7 +186,7 @@ class _AuthPageState extends State<AuthPage> {
                             ],
                           ),
                           child: ClipRRect(
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(5),
                             child: Image.asset(
                               'assets/images/cdpc_logo_square.png',
                               height: 80,

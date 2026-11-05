@@ -1625,7 +1625,7 @@ class _WelcomeCard extends StatelessWidget {
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(5),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.12),
@@ -1635,7 +1635,7 @@ class _WelcomeCard extends StatelessWidget {
               ],
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(5),
               child: Image.asset(
                 'assets/images/cdpc_logo_square.jpg',
                 width: 52,
@@ -1644,7 +1644,7 @@ class _WelcomeCard extends StatelessWidget {
                 errorBuilder: (_, _, _) => const Icon(
                   Icons.rocket_launch_rounded,
                   color: Color(0xFF0060AA),
-                  size: 28,
+                  size: 50,
                 ),
               ),
             ),
