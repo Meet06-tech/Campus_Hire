@@ -20,6 +20,7 @@ void main() {
     await tester.tap(find.text('Sign in'));
     await tester.pumpAndSettle();
 
+    expect(find.text('Career Development and Placement Cell'), findsOneWidget);
     expect(find.text('Placement Management System'), findsOneWidget);
     expect(find.text('Welcome back'), findsOneWidget);
   });
@@ -42,6 +43,32 @@ void main() {
     await tester.tap(find.text('History'));
     await tester.pumpAndSettle();
     expect(find.text('Application history'), findsOneWidget);
+  });
+
+  testWidgets('theme toggle switches repeatedly between dark and light mode', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const PlacementManagementApp());
+    await tester.tap(find.text('Sign in'));
+    await tester.pumpAndSettle();
+
+    // Initial state: Light mode
+    expect(find.byTooltip('Switch to dark mode'), findsOneWidget);
+
+    // Tap 1: Toggle to Dark mode
+    await tester.tap(find.byTooltip('Switch to dark mode'));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Switch to light mode'), findsOneWidget);
+
+    // Tap 2: Toggle back to Light mode
+    await tester.tap(find.byTooltip('Switch to light mode'));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Switch to dark mode'), findsOneWidget);
+
+    // Tap 3: Toggle to Dark mode again
+    await tester.tap(find.byTooltip('Switch to dark mode'));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Switch to light mode'), findsOneWidget);
   });
 }
 

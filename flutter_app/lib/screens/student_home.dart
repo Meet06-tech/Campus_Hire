@@ -2,8 +2,8 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
-import '../models/placement_models.dart';
 import '../models/placement_attachment.dart';
+import '../models/placement_models.dart';
 import '../services/placement_api.dart';
 import 'profile_page.dart';
 import 'settings_page.dart';
@@ -61,7 +61,7 @@ class _StudentHomeShellState extends State<StudentHomeShell>
       final photo = await widget.api.fetchProfilePhoto();
       if (mounted) setState(() => _photoBytes = photo);
     } catch (_) {
-      // The default avatar is the safe fallback when no photo is available.
+      // Default avatar fallback
     }
   }
 
@@ -89,6 +89,7 @@ class _StudentHomeShellState extends State<StudentHomeShell>
         historyOnly: true,
       ),
     ];
+
     return Scaffold(
       appBar: _CampusHireAppBar(
         photoBytes: _photoBytes,
@@ -121,17 +122,17 @@ class _StudentHomeShellState extends State<StudentHomeShell>
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
+            selectedIcon: Icon(Icons.home_rounded),
             label: 'Home',
           ),
           NavigationDestination(
             icon: Icon(Icons.assignment_outlined),
-            selectedIcon: Icon(Icons.assignment),
+            selectedIcon: Icon(Icons.assignment_rounded),
             label: 'Applied',
           ),
           NavigationDestination(
             icon: Icon(Icons.history_outlined),
-            selectedIcon: Icon(Icons.history),
+            selectedIcon: Icon(Icons.history_rounded),
             label: 'History',
           ),
         ],
@@ -158,20 +159,53 @@ class _CampusHireAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return AppBar(
-      titleSpacing: 12,
+      titleSpacing: 16,
       title: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
+          // CHARUSAT Logo
           Image.asset(
             'assets/images/charusat_logo.png',
-            width: 104,
-            height: 38,
+            height: 32,
             fit: BoxFit.contain,
-            errorBuilder: (_, _, _) => const Icon(Icons.school_outlined),
+            errorBuilder: (_, _, _) => Icon(
+              Icons.school_rounded,
+              color: colors.primary,
+              size: 26,
+            ),
           ),
           const SizedBox(width: 10),
+          Container(
+            height: 20,
+            width: 1,
+            color: colors.outline.withValues(alpha: 0.5),
+          ),
+          const SizedBox(width: 10),
+          // CDPC Square Logo (clearly visible and prominent)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.asset(
+              'assets/images/cdpc_logo_square.jpg',
+              height: 36,
+              width: 36,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => Icon(
+                Icons.work_outline_rounded,
+                size: 22,
+                color: colors.secondary,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
           const Flexible(
-            child: Text('CampusHire', overflow: TextOverflow.ellipsis),
+            child: Text(
+              'CDPC',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ),
@@ -179,12 +213,16 @@ class _CampusHireAppBar extends StatelessWidget implements PreferredSizeWidget {
         PopupMenuButton<String>(
           tooltip: 'Account',
           icon: CircleAvatar(
-            radius: 16,
-            backgroundImage: photoBytes == null
-                ? null
-                : MemoryImage(photoBytes!),
+            radius: 17,
+            backgroundColor: colors.primaryContainer,
+            backgroundImage:
+                photoBytes == null ? null : MemoryImage(photoBytes!),
             child: photoBytes == null
-                ? const Icon(Icons.account_circle_outlined)
+                ? Icon(
+                    Icons.person_outline_rounded,
+                    size: 20,
+                    color: colors.primary,
+                  )
                 : null,
           ),
           onSelected: (value) {
@@ -193,11 +231,40 @@ class _CampusHireAppBar extends StatelessWidget implements PreferredSizeWidget {
             if (value == 'logout') _confirmLogout(context);
           },
           itemBuilder: (_) => const [
-            PopupMenuItem(value: 'profile', child: Text('View Profile')),
-            PopupMenuItem(value: 'settings', child: Text('Settings')),
-            PopupMenuItem(value: 'logout', child: Text('Logout')),
+            PopupMenuItem(
+              value: 'profile',
+              child: Row(
+                children: [
+                  Icon(Icons.person_outline_rounded, size: 20),
+                  SizedBox(width: 12),
+                  Text('View Profile'),
+                ],
+              ),
+            ),
+            PopupMenuItem(
+              value: 'settings',
+              child: Row(
+                children: [
+                  Icon(Icons.settings_outlined, size: 20),
+                  SizedBox(width: 12),
+                  Text('Settings'),
+                ],
+              ),
+            ),
+            PopupMenuDivider(),
+            PopupMenuItem(
+              value: 'logout',
+              child: Row(
+                children: [
+                  Icon(Icons.logout_rounded, size: 20, color: Colors.redAccent),
+                  SizedBox(width: 12),
+                  Text('Logout', style: TextStyle(color: Colors.redAccent)),
+                ],
+              ),
+            ),
           ],
         ),
+        const SizedBox(width: 6),
       ],
     );
   }
@@ -217,6 +284,10 @@ class _CampusHireAppBar extends StatelessWidget implements PreferredSizeWidget {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Colors.white,
+            ),
             child: const Text('Logout'),
           ),
         ],
@@ -282,7 +353,7 @@ class _StudentDrivesTabState extends State<StudentDrivesTab> {
     }
     if (_drives.isEmpty) {
       return const _EmptyState(
-        icon: Icons.work_outline,
+        icon: Icons.work_outline_rounded,
         title: 'No placement drives yet',
         message:
             'Published opportunities matching your profile will appear here.',
@@ -290,38 +361,44 @@ class _StudentDrivesTabState extends State<StudentDrivesTab> {
     }
     return RefreshIndicator(
       onRefresh: _loadDrives,
-      child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 22, 16, 32),
-        itemCount: _drives.length + 1,
-        itemBuilder: (context, index) {
-          if (index == 0) {
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(0, 4, 0, 18),
-              child: _WelcomeCard(driveCount: _drives.length),
-            );
-          }
-          final drive = _drives[index - 1];
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: _DriveCard(
-              drive: drive,
-              onTap: () => Navigator.of(context)
-                  .push(
-                    MaterialPageRoute(
-                      builder: (_) => DriveDetailsPage(
-                        api: widget.api,
-                        drive: drive,
-                        onSessionExpired: widget.onSessionExpired,
-                        onApplicationChanged: widget.onApplicationChanged,
-                      ),
-                    ),
-                  )
-                  .then((_) {
-                    if (mounted) _loadDrives();
-                  }),
-            ),
-          );
-        },
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 860),
+          child: ListView.builder(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+            itemCount: _drives.length + 1,
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 20),
+                  child: _WelcomeCard(driveCount: _drives.length),
+                );
+              }
+              final drive = _drives[index - 1];
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 14),
+                child: _DriveCard(
+                  drive: drive,
+                  onTap: () => Navigator.of(context)
+                      .push(
+                        MaterialPageRoute(
+                          builder: (_) => DriveDetailsPage(
+                            api: widget.api,
+                            drive: drive,
+                            onSessionExpired: widget.onSessionExpired,
+                            onApplicationChanged: widget.onApplicationChanged,
+                          ),
+                        ),
+                      )
+                      .then((_) {
+                        if (mounted) _loadDrives();
+                      }),
+                ),
+              );
+            },
+          ),
+        ),
       ),
     );
   }
@@ -381,7 +458,16 @@ class _DriveDetailsPageState extends State<DriveDetailsPage> {
   @override
   void initState() {
     super.initState();
-    widget.api.fetchDriveAttachments(widget.drive.id).then((items) { if (mounted) setState(() { _attachments = items; _attachmentsLoading = false; }); }).catchError((_) { if (mounted) setState(() => _attachmentsLoading = false); });
+    widget.api.fetchDriveAttachments(widget.drive.id).then((items) {
+      if (mounted) {
+        setState(() {
+          _attachments = items;
+          _attachmentsLoading = false;
+        });
+      }
+    }).catchError((_) {
+      if (mounted) setState(() => _attachmentsLoading = false);
+    });
   }
 
   @override
@@ -389,142 +475,191 @@ class _DriveDetailsPageState extends State<DriveDetailsPage> {
     final drive = widget.drive;
     return Scaffold(
       appBar: AppBar(title: const Text('Drive details')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-        children: [
-          _DriveHero(drive: drive),
-          const SizedBox(height: 16),
-          if (drive.jobDescription?.isNotEmpty == true)
-            _DetailsCard(
-              title: 'About this role',
-              icon: Icons.description_outlined,
-              child: Text(
-                drive.jobDescription!,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  height: 1.45,
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 860),
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+            children: [
+              _DriveHero(drive: drive),
+              const SizedBox(height: 16),
+              if (drive.jobDescription?.isNotEmpty == true)
+                _DetailsCard(
+                  title: 'About this role',
+                  icon: Icons.description_outlined,
+                  child: Text(
+                    drive.jobDescription!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      height: 1.5,
+                    ),
+                  ),
+                ),
+              _DetailsCard(
+                title: 'Drive Information',
+                icon: Icons.work_outline_rounded,
+                child: Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    _DetailTile(label: 'Job type', value: drive.jobType),
+                    _DetailTile(label: 'Location', value: drive.location),
+                    _DetailTile(
+                      label: 'CTC',
+                      value: _money(drive.ctcAmount, drive.ctcCurrency),
+                    ),
+                    _DetailTile(
+                      label: 'Deadline',
+                      value: _formatDate(drive.applicationDeadline),
+                    ),
+                  ],
                 ),
               ),
-            ),
-          _DetailsCard(
-            title: 'Drive information',
-            icon: Icons.work_outline,
-            child: Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                _DetailTile(label: 'Job type', value: drive.jobType),
-                _DetailTile(label: 'Location', value: drive.location),
-                _DetailTile(label: 'CTC', value: _money(drive.ctcAmount, drive.ctcCurrency)),
-                _DetailTile(
-                  label: 'Deadline',
-                  value: _formatDate(drive.applicationDeadline),
+              if (_hasOptionalDetails(drive))
+                _DetailsCard(
+                  title: 'Opportunity Details',
+                  icon: Icons.payments_outlined,
+                  child: Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      _DetailTile(label: 'Employment', value: drive.employmentType),
+                      _DetailTile(label: 'Position', value: drive.positionType),
+                      _DetailTile(
+                        label: 'CTC',
+                        value: _money(drive.ctcAmount, drive.ctcCurrency),
+                      ),
+                      _DetailTile(label: 'Stipend', value: drive.stipend),
+                    ],
+                  ),
+                ),
+              if (drive.otherBenefits?.trim().isNotEmpty == true)
+                _DetailsCard(
+                  title: 'Other Benefits',
+                  icon: Icons.card_giftcard_outlined,
+                  child: Text(drive.otherBenefits!),
+                ),
+              if (drive.bondDetails?.trim().isNotEmpty == true)
+                _DetailsCard(
+                  title: 'Bond Details',
+                  icon: Icons.assignment_late_outlined,
+                  child: Text(drive.bondDetails!),
+                ),
+              if (!_attachmentsLoading && _attachments.isNotEmpty)
+                _DetailsCard(
+                  title: 'Attachments',
+                  icon: Icons.attach_file_rounded,
+                  child: Column(
+                    children: _attachments
+                        .map(
+                          (file) => ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: const Icon(Icons.insert_drive_file_outlined),
+                            title: Text(file.fileName),
+                            subtitle: Text(file.contentType),
+                            trailing: const Icon(Icons.download_outlined),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ),
+              _DetailsCard(
+                title: 'Eligibility Criteria',
+                icon: Icons.verified_user_outlined,
+                child: Column(
+                  children: [
+                    _EligibilityRow(
+                      label: 'Minimum CGPA',
+                      value: drive.minimumCgpa?.toString() ?? 'Not specified',
+                    ),
+                    _EligibilityRow(
+                      label: 'Graduation year',
+                      value: drive.graduationYear?.toString() ?? 'Not specified',
+                    ),
+                    _EligibilityRow(
+                      label: 'Active backlogs',
+                      value: drive.maximumActiveBacklogs?.toString() ??
+                          'Not specified',
+                    ),
+                    _EligibilityRow(
+                      label: 'Eligible programs',
+                      value: drive.eligibleProgramCodes.isEmpty
+                          ? 'Open to all eligible programs'
+                          : drive.eligibleProgramCodes.join(', '),
+                      isLast: true,
+                    ),
+                  ],
+                ),
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.errorContainer,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Text(
+                    _error!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onErrorContainer,
+                    ),
+                  ),
                 ),
               ],
-            ),
+              const SizedBox(height: 24),
+              if (drive.status == 'PUBLISHED')
+                SizedBox(
+                  height: 52,
+                  child: FilledButton.icon(
+                    onPressed: _applying ? null : _apply,
+                    icon: _applying
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.send_rounded),
+                    label: Text(
+                      _applying
+                          ? 'Submitting application...'
+                          : 'Apply for this drive',
+                    ),
+                  ),
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .surfaceContainerHighest
+                        .withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Center(
+                    child: Text('Applications are closed for this drive.'),
+                  ),
+                ),
+            ],
           ),
-          if (_hasOptionalDetails(drive))
-            _DetailsCard(
-              title: 'Opportunity details',
-              icon: Icons.payments_outlined,
-              child: Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  _DetailTile(label: 'Employment', value: drive.employmentType),
-                  _DetailTile(label: 'Position', value: drive.positionType),
-                  _DetailTile(label: 'CTC', value: _money(drive.ctcAmount, drive.ctcCurrency)),
-                  _DetailTile(label: 'Stipend', value: drive.stipend),
-                ],
-              ),
-            ),
-          if (drive.otherBenefits?.trim().isNotEmpty == true)
-            _DetailsCard(title: 'Other benefits', icon: Icons.card_giftcard_outlined, child: Text(drive.otherBenefits!)),
-          if (drive.bondDetails?.trim().isNotEmpty == true)
-            _DetailsCard(title: 'Bond details', icon: Icons.description_outlined, child: Text(drive.bondDetails!)),
-          if (!_attachmentsLoading && _attachments.isNotEmpty)
-            _DetailsCard(title: 'Attachments', icon: Icons.attach_file, child: Column(children: _attachments.map((file) => ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.insert_drive_file_outlined), title: Text(file.fileName), subtitle: Text(file.contentType), trailing: const Icon(Icons.download_outlined))).toList())),
-          _DetailsCard(
-            title: 'Eligibility',
-            icon: Icons.verified_user_outlined,
-            child: Column(
-              children: [
-                _EligibilityRow(
-                  label: 'Minimum CGPA',
-                  value: drive.minimumCgpa?.toString() ?? 'Not specified',
-                ),
-                _EligibilityRow(
-                  label: 'Graduation year',
-                  value: drive.graduationYear?.toString() ?? 'Not specified',
-                ),
-                _EligibilityRow(
-                  label: 'Active backlogs',
-                  value:
-                      drive.maximumActiveBacklogs?.toString() ??
-                      'Not specified',
-                ),
-                _EligibilityRow(
-                  label: 'Programs',
-                  value: drive.eligibleProgramCodes.isEmpty
-                      ? 'Open to all eligible programs'
-                      : drive.eligibleProgramCodes.join(', '),
-                  isLast: true,
-                ),
-              ],
-            ),
-          ),
-          if (_error != null) ...[
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.errorContainer,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Text(
-                _error!,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onErrorContainer,
-                ),
-              ),
-            ),
-          ],
-          const SizedBox(height: 24),
-          if (drive.status == 'PUBLISHED')
-            SizedBox(
-              height: 54,
-              child: FilledButton.icon(
-                onPressed: _applying ? null : _apply,
-                icon: _applying
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.send_rounded),
-                label: Text(
-                  _applying
-                      ? 'Submitting application...'
-                      : 'Apply for this drive',
-                ),
-              ),
-            )
-          else
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Text('Applications are closed for this drive.'),
-            ),
-        ],
+        ),
       ),
     );
   }
 
-  bool _hasOptionalDetails(PlacementDrive drive) => [drive.employmentType, drive.positionType, drive.ctcAmount?.toString(), drive.stipend].any((value) => value?.trim().isNotEmpty == true);
-  String? _money(double? amount, String? currency) => amount == null ? null : '${currency ?? ''} ${amount.toStringAsFixed(2)}'.trim();
+  bool _hasOptionalDetails(PlacementDrive drive) => [
+        drive.employmentType,
+        drive.positionType,
+        drive.ctcAmount?.toString(),
+        drive.stipend,
+      ].any((value) => value?.trim().isNotEmpty == true);
+
+  String? _money(double? amount, String? currency) =>
+      amount == null ? null : '${currency ?? ''} ${amount.toStringAsFixed(2)}'.trim();
 }
 
 class ApplicationsTab extends StatefulWidget {
@@ -588,7 +723,7 @@ class _ApplicationsTabState extends State<ApplicationsTab> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text('${action[0].toUpperCase()}${action.substring(1)} offer?'),
-        content: Text('This decision cannot be changed later.'),
+        content: const Text('This decision cannot be changed later.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -609,8 +744,9 @@ class _ApplicationsTabState extends State<ApplicationsTab> {
       if (error.statusCode == 401) {
         widget.onSessionExpired();
       } else if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(error.message)));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.message)),
+        );
       }
     }
   }
@@ -633,27 +769,35 @@ class _ApplicationsTabState extends State<ApplicationsTab> {
     }
     return RefreshIndicator(
       onRefresh: _loadApplications,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 22, 16, 32),
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 0, 4, 18),
-            child: Text(
-              widget.title,
-              style: Theme.of(context).textTheme.headlineSmall
-                  ?.copyWith(fontWeight: FontWeight.w700),
-            ),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 860),
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 0, 4, 16),
+                child: Text(
+                  widget.title,
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.2,
+                      ),
+                ),
+              ),
+              ...visibleApplications.map(
+                (application) => widget.historyOnly
+                    ? _HistoryApplicationCard(
+                        application: application,
+                        onDecision: (decision) =>
+                            _decideOffer(decision, application),
+                      )
+                    : _ApplicationCard(application: application),
+              ),
+            ],
           ),
-          ...visibleApplications.map(
-            (application) => widget.historyOnly
-                ? _HistoryApplicationCard(
-                    application: application,
-                    onDecision: (decision) =>
-                        _decideOffer(decision, application),
-                  )
-                : _ApplicationCard(application: application),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -670,14 +814,13 @@ class _HistoryApplicationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final selected =
-        application.finalOutcome == 'SELECTED' ||
+    final selected = application.finalOutcome == 'SELECTED' ||
         application.applicationStatus == 'SELECTED';
     final applicationRejected =
         application.applicationStatus == 'APPLICATION_REJECTED';
     final colors = Theme.of(context).colorScheme;
-    final normalizedOfferStatus = (application.offerStatus ?? 'PENDING')
-        .toUpperCase();
+    final normalizedOfferStatus =
+        (application.offerStatus ?? 'PENDING').toUpperCase();
     final offerPending = selected && normalizedOfferStatus == 'PENDING';
     final offerLabel = switch (normalizedOfferStatus) {
       'ACCEPTED' => 'Offer Accepted',
@@ -695,38 +838,44 @@ class _HistoryApplicationCard extends StatelessWidget {
       _ => colors.onPrimaryContainer,
     };
     final companyResult = selected ? 'Selected' : 'Rejected';
+
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 14),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.all(16),
         child: Column(
           children: [
             ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: CircleAvatar(
-                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                child: Icon(
-                  Icons.business_outlined,
-                  color: Theme.of(context).colorScheme.primary,
+              leading: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: colors.primaryContainer,
+                  borderRadius: BorderRadius.circular(12),
                 ),
+                child: Icon(Icons.business_rounded, color: colors.primary),
               ),
               title: Text(
                 application.companyName,
                 style: const TextStyle(fontWeight: FontWeight.w800),
               ),
-              subtitle: Text('Applied ${_formatDate(application.appliedAt)}'),
-              trailing: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 7,
+              subtitle: Text(
+                'Applied ${_formatDate(application.appliedAt)}',
+                style: TextStyle(
+                  color: colors.onSurfaceVariant,
+                  fontSize: 12,
                 ),
+              ),
+              trailing: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: selected
                       ? offerBadgeBackground
                       : colors.errorContainer,
                   borderRadius: BorderRadius.circular(20),
                 ),
-                  child: Text(
+                child: Text(
                   selected
                       ? offerLabel
                       : applicationRejected
@@ -740,6 +889,7 @@ class _HistoryApplicationCard extends StatelessWidget {
                 ),
               ),
             ),
+            const SizedBox(height: 6),
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
@@ -750,7 +900,7 @@ class _HistoryApplicationCard extends StatelessWidget {
               ),
             ),
             if (offerPending) ...[
-              const Divider(),
+              const Divider(height: 24),
               const Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
@@ -758,16 +908,20 @@ class _HistoryApplicationCard extends StatelessWidget {
                   style: TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () => onDecision('DECLINED'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: colors.error,
+                        side: BorderSide(color: colors.error),
+                      ),
                       child: const Text('Decline'),
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: FilledButton(
                       onPressed: () => onDecision('ACCEPTED'),
@@ -777,14 +931,17 @@ class _HistoryApplicationCard extends StatelessWidget {
                 ],
               ),
             ] else if (selected && normalizedOfferStatus != 'PENDING')
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Decision recorded ${application.offerDecidedAt == null ? '' : 'on ${_formatDate(application.offerDecidedAt)}'}'
-                      .trim(),
-                  style: TextStyle(
-                    color: colors.onSurfaceVariant,
-                    fontSize: 13,
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Decision recorded ${application.offerDecidedAt == null ? '' : 'on ${_formatDate(application.offerDecidedAt)}'}'
+                        .trim(),
+                    style: TextStyle(
+                      color: colors.onSurfaceVariant,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
               ),
@@ -805,11 +962,12 @@ class _DriveCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     return Card(
+      elevation: 0,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(20),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(18),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -836,9 +994,10 @@ class _DriveCard extends StatelessWidget {
                           style: TextStyle(
                             color: colors.primary,
                             fontWeight: FontWeight.w700,
+                            fontSize: 14,
                           ),
                         ),
-                        const SizedBox(height: 3),
+                        const SizedBox(height: 2),
                         Text(
                           'Placement opportunity',
                           style: TextStyle(
@@ -850,29 +1009,32 @@ class _DriveCard extends StatelessWidget {
                     ),
                   ),
                   Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    size: 16,
+                    Icons.chevron_right_rounded,
+                    size: 22,
                     color: colors.onSurfaceVariant,
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
               Text(
                 drive.title,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.2,
-                ),
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.2,
+                    ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: [
                   if (drive.jobType?.isNotEmpty == true)
-                    _InfoPill(icon: Icons.work_outline, text: drive.jobType!),
+                    _InfoPill(
+                      icon: Icons.work_outline_rounded,
+                      text: drive.jobType!,
+                    ),
                   if (drive.location?.isNotEmpty == true)
                     _InfoPill(
                       icon: Icons.location_on_outlined,
@@ -881,24 +1043,30 @@ class _DriveCard extends StatelessWidget {
                   if (drive.ctcAmount != null)
                     _InfoPill(
                       icon: Icons.payments_outlined,
-                      text: '${drive.ctcCurrency ?? ''} ${drive.ctcAmount!.toStringAsFixed(2)}'.trim(),
+                      text:
+                          '${drive.ctcCurrency ?? ''} ${drive.ctcAmount!.toStringAsFixed(2)}'
+                              .trim(),
                     ),
                 ],
               ),
               if (drive.applicationDeadline != null) ...[
-                const SizedBox(height: 16),
-                Divider(height: 1, color: colors.outlineVariant),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
+                Divider(height: 1, color: colors.outline.withValues(alpha: 0.5)),
+                const SizedBox(height: 10),
                 Row(
                   children: [
-                    Icon(Icons.schedule_rounded, size: 17, color: colors.error),
-                    const SizedBox(width: 7),
+                    Icon(
+                      Icons.schedule_rounded,
+                      size: 16,
+                      color: colors.secondary,
+                    ),
+                    const SizedBox(width: 6),
                     Text(
                       'Apply by ${_formatDate(drive.applicationDeadline)}',
                       style: TextStyle(
                         color: colors.onSurface,
                         fontWeight: FontWeight.w600,
-                        fontSize: 13,
+                        fontSize: 12,
                       ),
                     ),
                   ],
@@ -921,10 +1089,24 @@ class _DriveHero extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: colors.primary,
+        gradient: LinearGradient(
+          colors: [
+            colors.primary,
+            const Color(0xFF0284C7),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: colors.primary.withValues(alpha: 0.22),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -935,7 +1117,7 @@ class _DriveHero extends StatelessWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.16),
+                  color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: const Icon(Icons.business_rounded, color: Colors.white),
@@ -953,20 +1135,23 @@ class _DriveHero extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 22),
+          const SizedBox(height: 20),
           Text(
             drive.title,
             style: const TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.w800,
-              fontSize: 26,
-              height: 1.12,
+              fontSize: 24,
+              height: 1.2,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             'Published placement opportunity',
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.8)),
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.8),
+              fontSize: 13,
+            ),
           ),
         ],
       ),
@@ -998,7 +1183,7 @@ class _DetailsCard extends StatelessWidget {
             Row(
               children: [
                 Icon(icon, size: 20, color: colors.primary),
-                const SizedBox(width: 9),
+                const SizedBox(width: 10),
                 Text(
                   title,
                   style: const TextStyle(
@@ -1008,7 +1193,7 @@ class _DetailsCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
             child,
           ],
         ),
@@ -1028,11 +1213,14 @@ class _DetailTile extends StatelessWidget {
     if (value == null || value!.trim().isEmpty) return const SizedBox.shrink();
     final colors = Theme.of(context).colorScheme;
     return Container(
-      width: 145,
+      width: 150,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: colors.surfaceContainerHighest.withValues(alpha: 0.45),
+        color: colors.primaryContainer.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: colors.primary.withValues(alpha: 0.15),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1041,12 +1229,12 @@ class _DetailTile extends StatelessWidget {
             label,
             style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
           ),
-          const SizedBox(height: 5),
+          const SizedBox(height: 4),
           Text(
             value!,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontWeight: FontWeight.w700),
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
           ),
         ],
       ),
@@ -1073,7 +1261,11 @@ class _EligibilityRow extends StatelessWidget {
       decoration: isLast
           ? null
           : BoxDecoration(
-              border: Border(bottom: BorderSide(color: colors.outlineVariant)),
+              border: Border(
+                bottom: BorderSide(
+                  color: colors.outline.withValues(alpha: 0.4),
+                ),
+              ),
             ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1081,7 +1273,7 @@ class _EligibilityRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: TextStyle(color: colors.onSurfaceVariant),
+              style: TextStyle(color: colors.onSurfaceVariant, fontSize: 13),
             ),
           ),
           const SizedBox(width: 12),
@@ -1089,7 +1281,7 @@ class _EligibilityRow extends StatelessWidget {
             child: Text(
               value,
               textAlign: TextAlign.end,
-              style: const TextStyle(fontWeight: FontWeight.w700),
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
             ),
           ),
         ],
@@ -1108,8 +1300,9 @@ class _ApplicationCard extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     final statusColor = _statusColor(colors, application);
     final statusLabel = _applicationStatusLabel(application);
+
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 14),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -1117,11 +1310,11 @@ class _ApplicationCard extends StatelessWidget {
             Row(
               children: [
                 Container(
-                  width: 46,
-                  height: 46,
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
                     color: colors.primaryContainer,
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
                     Icons.work_history_rounded,
@@ -1135,14 +1328,17 @@ class _ApplicationCard extends StatelessWidget {
                     children: [
                       Text(
                         application.driveTitle,
-                        style: const TextStyle(fontWeight: FontWeight.w800),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                        ),
                       ),
-                      const SizedBox(height: 5),
+                      const SizedBox(height: 3),
                       Text(
                         '${application.companyName} · Applied ${_formatDate(application.appliedAt)}',
                         style: TextStyle(
                           color: colors.onSurfaceVariant,
-                          fontSize: 13,
+                          fontSize: 12,
                         ),
                       ),
                     ],
@@ -1152,7 +1348,7 @@ class _ApplicationCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
-                    vertical: 7,
+                    vertical: 6,
                   ),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.12),
@@ -1170,25 +1366,28 @@ class _ApplicationCard extends StatelessWidget {
               ],
             ),
             if (application.rounds.isNotEmpty) ...[
-              const Divider(height: 28),
+              const Divider(height: 24),
               const Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
                   'Recruitment progress',
-                  style: TextStyle(fontWeight: FontWeight.w800),
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               ...application.rounds.map(
                 (round) => _RoundProgressRow(round: round),
               ),
             ] else ...[
-              const SizedBox(height: 14),
-              const Align(
+              const SizedBox(height: 12),
+              Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
                   'Recruitment rounds have not been configured yet.',
-                  style: TextStyle(fontSize: 13),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: colors.onSurfaceVariant,
+                  ),
                 ),
               ),
             ],
@@ -1211,26 +1410,42 @@ class _RoundProgressRow extends StatelessWidget {
     final label = visible ? _roundStatusLabel(round.status) : 'Results pending';
     final color = visible && round.status == 'CLEARED'
         ? Colors.green.shade700
-        : visible && (round.status == 'NOT_CLEARED' || round.status == 'NOT_APPLICABLE')
-        ? colors.error
-        : colors.onSurfaceVariant;
+        : visible &&
+                (round.status == 'NOT_CLEARED' ||
+                    round.status == 'NOT_APPLICABLE')
+            ? colors.error
+            : colors.onSurfaceVariant;
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         children: [
           CircleAvatar(
-            radius: 14,
+            radius: 12,
             backgroundColor: colors.primaryContainer,
             child: Text(
               '${round.order}',
-              style: TextStyle(color: colors.primary),
+              style: TextStyle(
+                color: colors.primary,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
           const SizedBox(width: 10),
-          Expanded(child: Text(round.name)),
+          Expanded(
+            child: Text(
+              round.name,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+            ),
+          ),
           Text(
             label,
-            style: TextStyle(color: color, fontWeight: FontWeight.w700),
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+            ),
           ),
         ],
       ),
@@ -1302,19 +1517,30 @@ class _InfoPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: colors.surfaceContainerHighest.withValues(alpha: 0.55),
+        color: colors.primaryContainer.withValues(alpha: 0.35),
         borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: colors.primary.withValues(alpha: 0.15),
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 15, color: colors.primary),
+          Icon(icon, size: 14, color: colors.primary),
           const SizedBox(width: 6),
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 180),
-            child: Text(text, overflow: TextOverflow.ellipsis),
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: colors.onSurface,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ),
@@ -1331,10 +1557,13 @@ class _WelcomeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 22),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [colors.primary, const Color(0xFF1D4ED8)],
+          colors: [
+            colors.primary,
+            const Color(0xFF0284C7),
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -1343,7 +1572,7 @@ class _WelcomeCard extends StatelessWidget {
           BoxShadow(
             color: colors.primary.withValues(alpha: 0.22),
             blurRadius: 18,
-            offset: const Offset(0, 8),
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -1353,8 +1582,32 @@ class _WelcomeCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.stars_rounded, size: 14, color: Colors.white),
+                      SizedBox(width: 6),
+                      Text(
+                        'CHARUSAT · CDPC',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
                 const Text(
-                  'Your next opportunity\nstarts here',
+                  'Placement Drives',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 22,
@@ -1362,28 +1615,45 @@ class _WelcomeCard extends StatelessWidget {
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 6),
                 Text(
                   '$driveCount published ${driveCount == 1 ? 'drive' : 'drives'} matched to your profile',
                   style: const TextStyle(
-                    color: Color(0xFFDCEBFF),
+                    color: Color(0xFFE0F2FE),
+                    fontSize: 13,
                     height: 1.35,
                   ),
                 ),
               ],
             ),
           ),
+          const SizedBox(width: 14),
           Container(
-            width: 58,
-            height: 58,
+            padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.16),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.rocket_launch_rounded,
               color: Colors.white,
-              size: 28,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.12),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.asset(
+                'assets/images/cdpc_logo_square.jpg',
+                width: 52,
+                height: 52,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => const Icon(
+                  Icons.rocket_launch_rounded,
+                  color: Color(0xFF0060AA),
+                  size: 28,
+                ),
+              ),
             ),
           ),
         ],
@@ -1420,8 +1690,9 @@ class _EmptyState extends StatelessWidget {
             const SizedBox(height: 18),
             Text(
               title,
-              style: Theme.of(context).textTheme.headlineSmall
-                  ?.copyWith(fontWeight: FontWeight.w700),
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
             ),
             const SizedBox(height: 8),
             Text(
@@ -1444,24 +1715,24 @@ class _ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(28),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.error_outline,
-            size: 42,
-            color: Theme.of(context).colorScheme.error,
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.error_outline_rounded,
+                size: 42,
+                color: Theme.of(context).colorScheme.error,
+              ),
+              const SizedBox(height: 12),
+              Text(message, textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              OutlinedButton(onPressed: onRetry, child: const Text('Try again')),
+            ],
           ),
-          const SizedBox(height: 12),
-          Text(message, textAlign: TextAlign.center),
-          const SizedBox(height: 16),
-          OutlinedButton(onPressed: onRetry, child: const Text('Try again')),
-        ],
-      ),
-    ),
-  );
+        ),
+      );
 }
 
 String _formatDate(DateTime? date) {
