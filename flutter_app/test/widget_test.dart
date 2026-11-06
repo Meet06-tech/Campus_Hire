@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:placement_management_app/main.dart';
+import 'package:placement_management_app/models/announcement.dart';
 import 'package:placement_management_app/models/placement_models.dart';
 import 'package:placement_management_app/screens/student_home.dart';
 import 'package:placement_management_app/services/placement_api.dart';
@@ -25,7 +26,7 @@ void main() {
     expect(find.text('Welcome back'), findsOneWidget);
   });
 
-  testWidgets('student shell switches between the three local destinations', (
+testWidgets('student shell switches between the four local destinations', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
@@ -43,6 +44,10 @@ void main() {
     await tester.tap(find.text('History'));
     await tester.pumpAndSettle();
     expect(find.text('Application history'), findsOneWidget);
+
+    await tester.tap(find.text('Announcements'));
+    await tester.pumpAndSettle();
+    expect(find.text('No announcements yet'), findsOneWidget);
   });
 
   testWidgets('theme toggle switches repeatedly between dark and light mode', (
@@ -89,4 +94,7 @@ class _FakePlacementApi extends PlacementApi {
 
   @override
   Future<Uint8List?> fetchProfilePhoto() async => null;
+
+  @override
+  Future<List<Announcement>> fetchAnnouncements() async => const [];
 }

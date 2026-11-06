@@ -148,6 +148,24 @@ export interface DepartmentInfo {
   name: string;
 }
 
+export interface AnnouncementRequest {
+  subject: string;
+  title: string;
+  message: string;
+}
+
+export interface Announcement {
+  id: number;
+  subject: string;
+  title: string;
+  message: string;
+  publisherName: string;
+  publisherRole: 'UTPO' | 'DTPO';
+  departmentId: number | null;
+  departmentName: string | null;
+  publishedAt: string;
+}
+
 export interface CoordinatorRequest {
   fullName: string;
   universityEmail: string;

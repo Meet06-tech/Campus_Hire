@@ -15,3 +15,7 @@ nav { display: grid; gap: 5px; } nav button { border: 0; background: transparent
 @media (max-width: 700px) { .dashboard-shell { display: block; }.sidebar { width: 100%; padding: 15px; }.brand { padding: 0 5px 15px; }.sidebar nav { display: flex; overflow-x: auto; }.sidebar nav button { white-space: nowrap; }.sidebar-footer { display: none; }.topbar { padding: 16px 20px; align-items: flex-start; }.account small, .logout { display: none; }.content { padding: 22px 15px 35px; }.welcome, .section-toolbar { display: block; }.welcome .primary, .section-toolbar .primary { margin-top: 15px; }.metric-grid, .report-grid, .report-download-grid { grid-template-columns: 1fr 1fr; }.form-grid { grid-template-columns: 1fr; }.form-grid .wide { grid-column: auto; } }
 @media (max-width: 850px) { .round-layout { grid-template-columns: 1fr; }.round-header { align-items: flex-start; gap: 12px; } }
 @media (max-width: 430px) { .metric-grid, .report-grid, .report-download-grid { grid-template-columns: 1fr; }.topbar h1 { font-size: 1.3rem; } }
+.announcement-row { padding: 18px 0; border-bottom: 1px solid #edf2f7; }
+.announcement-row:last-of-type { border-bottom: 0; }
+.announcement-row h3 { margin: 4px 0 8px; color: #153b62; }
+.announcement-message { margin: 0 0 10px; color: #51677f; white-space: pre-wrap; line-height: 1.6; }

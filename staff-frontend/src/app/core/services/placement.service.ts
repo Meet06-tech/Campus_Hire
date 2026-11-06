@@ -4,7 +4,7 @@ import { Observable } from 'rxjs';
 import { HttpParams } from '@angular/common/http';
 
 import { environment } from '../../../environments/environment';
-import { ApplicationResponse, ApplicationStatus, Company, CompanyRequest, Coordinator, CoordinatorRequest, DashboardSummary, DepartmentInfo, DriveRequest, PlacementAttachment, PlacementDrive, RecruitmentRound, RoundCandidate, RoundRequest, StaffApplication, StaffApplicationPage, StaffStudentPage } from '../models/placement.models';
+import { Announcement, AnnouncementRequest, ApplicationResponse, ApplicationStatus, Company, CompanyRequest, Coordinator, CoordinatorRequest, DashboardSummary, DepartmentInfo, DriveRequest, PlacementAttachment, PlacementDrive, RecruitmentRound, RoundCandidate, RoundRequest, StaffApplication, StaffApplicationPage, StaffStudentPage } from '../models/placement.models';
 
 @Injectable({ providedIn: 'root' })
 export class PlacementService {
@@ -87,6 +87,14 @@ export class PlacementService {
 
   listDepartments(): Observable<DepartmentInfo[]> {
     return this.http.get<DepartmentInfo[]>(`${this.apiUrl}/api/placement/departments`);
+  }
+
+  listAnnouncements(): Observable<Announcement[]> {
+    return this.http.get<Announcement[]>(`${this.apiUrl}/api/announcements/staff`);
+  }
+
+  publishAnnouncement(request: AnnouncementRequest): Observable<Announcement> {
+    return this.http.post<Announcement>(`${this.apiUrl}/api/announcements`, request);
   }
 
   listCoordinators(): Observable<Coordinator[]> {
