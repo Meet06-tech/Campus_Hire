@@ -14,9 +14,66 @@ public interface PlacementApplicationRepository extends JpaRepository<PlacementA
     boolean existsByStudent_IdAndOfferStatus(Long studentId, OfferStatus offerStatus);
     List<PlacementApplication> findAllByStudent_IdOrderByAppliedAtDesc(Long studentId);
     List<PlacementApplication> findAllByDrive_IdOrderByAppliedAtAsc(Long driveId);
+    List<PlacementApplication> findAllByStatusOrderByAppliedAtAsc(ApplicationStatus status);
+    List<PlacementApplication> findAllByStatusAndStudent_Department_IdOrderByAppliedAtAsc(ApplicationStatus status, Long departmentId);
     long countByStatus(ApplicationStatus status);
     long countByDrive_Department_Id(Long departmentId);
     long countByDrive_Department_IdAndStatus(Long departmentId, ApplicationStatus status);
+
+    @Query("select distinct a.drive.id from PlacementApplication a where a.student.department.id = :departmentId")
+    Set<Long> findDistinctDriveIdsByStudentDepartmentId(@Param("departmentId") Long departmentId);
+
+    interface CompanyHiringProjection {
+        Long getCompanyId();
+        String getCompanyName();
+        String getDepartmentName();
+        String getDriveTitle();
+        java.math.BigDecimal getCtcAmount();
+        String getCtcCurrency();
+        java.time.Instant getPlacementDate();
+        Long getHiredCount();
+    }
+
+    @Query("""
+        select c.id as companyId, c.name as companyName, s.department.name as departmentName, drive.title as driveTitle,
+               drive.ctcAmount as ctcAmount, drive.ctcCurrency as ctcCurrency,
+               min(a.placementSelectedAt) as placementDate, count(distinct a.id) as hiredCount
+        from PlacementApplication a
+        join a.drive drive join drive.company c
+        join a.student s
+        where a.status = :status
+        group by c.id, c.name, s.department.name, drive.title, drive.ctcAmount, drive.ctcCurrency, drive.id
+        order by c.name, s.department.name, drive.title
+        """)
+    List<CompanyHiringProjection> findCompanyHiringReport(@Param("status") ApplicationStatus status);
+
+    @Query("""
+        select c.id as companyId, c.name as companyName, s.department.name as departmentName, drive.title as driveTitle,
+               drive.ctcAmount as ctcAmount, drive.ctcCurrency as ctcCurrency,
+               min(a.placementSelectedAt) as placementDate, count(distinct a.id) as hiredCount
+        from PlacementApplication a
+        join a.drive drive join drive.company c
+        join a.student s
+        where a.status = :status and s.department.id = :departmentId
+        group by c.id, c.name, s.department.name, drive.title, drive.ctcAmount, drive.ctcCurrency, drive.id
+        order by c.name, s.department.name, drive.title
+        """)
+    List<CompanyHiringProjection> findCompanyHiringReportByStudentDepartment(
+            @Param("status") ApplicationStatus status, @Param("departmentId") Long departmentId);
+
+    @Query("""
+        select c.id as companyId, c.name as companyName, s.department.name as departmentName, drive.title as driveTitle,
+               drive.ctcAmount as ctcAmount, drive.ctcCurrency as ctcCurrency,
+               min(a.placementSelectedAt) as placementDate, count(distinct a.id) as hiredCount
+        from PlacementApplication a
+        join a.drive drive join drive.company c
+        join a.student s
+        where a.status = :status and drive.department.id = :departmentId
+        group by c.id, c.name, s.department.name, drive.title, drive.ctcAmount, drive.ctcCurrency, drive.id
+        order by c.name, s.department.name, drive.title
+        """)
+    List<CompanyHiringProjection> findCompanyHiringReportByDriveDepartment(
+            @Param("status") ApplicationStatus status, @Param("departmentId") Long departmentId);
 
     @Query("select count(distinct a.student.id) from PlacementApplication a where (:departmentId is null or a.drive.department.id = :departmentId)")
     long countDistinctStudentsByDriveDepartment(@Param("departmentId") Long departmentId);

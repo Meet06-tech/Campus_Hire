@@ -5,7 +5,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -26,6 +28,7 @@ import com.placementmanagement.api.placement.entity.PlacementApplication;
 import com.placementmanagement.api.placement.entity.PlacementDrive;
 import com.placementmanagement.api.placement.repository.PlacementApplicationRepository;
 import com.placementmanagement.api.placement.repository.PlacementDriveRepository;
+import com.placementmanagement.api.placement.repository.PlacementApplicationRepository.CompanyHiringProjection;
 
 @Service
 public class PlacementReportService {
@@ -43,25 +46,46 @@ public class PlacementReportService {
         this.students = students;
     }
 
-    public byte[] placed(Authentication auth, boolean excel) {
+    public byte[] placed(Authentication auth, Long departmentId, boolean excel) {
         UserAccount user = authorization.staff(auth);
+        departmentId = scopedDepartment(user, departmentId);
         List<List<String>> rows = new ArrayList<>();
         rows.add(List.of("Student name", "Enrollment number", "Email", "Department", "Program", "Semester",
                 "Company", "Drive", "Status", "CTC", "Applied at", "Placement date"));
-        applications.findAll().stream().filter(a -> a.getStatus() == ApplicationStatus.SELECTED)
+        placedApplications(departmentId).stream()
                 .filter(a -> inScope(user, a.getDrive())).forEach(a -> rows.add(placedRow(a)));
         return render(rows, excel);
     }
 
-    public byte[] visitedCompanies(Authentication auth, boolean excel) {
+    public byte[] visitedCompanies(Authentication auth, Long departmentId, boolean excel) {
         UserAccount user = authorization.staff(auth);
+        departmentId = scopedDepartment(user, departmentId);
         List<List<String>> rows = new ArrayList<>();
         rows.add(List.of("Company", "Website", "Contact email", "Drive", "Drive status", "Deadline", "Employment type", "CTC", "Stipend"));
-        drives.findAll().stream().filter(d -> inScope(user, d)).forEach(d -> rows.add(List.of(
+        visitedDrives(user, departmentId).forEach(d -> rows.add(List.of(
                 d.getCompany().getName(), value(d.getCompany().getWebsite()),
                 value(d.getCompany().getHrContactEmail()), value(d.getTitle()), d.getStatus().name(),
                 formatDate(d.getApplicationDeadline()), value(d.getEmploymentType()),
                 formatCtc(d.getCtcAmount(), d.getCtcCurrency()), value(d.getStipend()))));
+        return render(rows, excel);
+    }
+
+    public byte[] companyHiring(Authentication auth, Long departmentId, boolean excel) {
+        UserAccount user = authorization.staff(auth);
+        departmentId = scopedDepartment(user, departmentId);
+        List<CompanyHiringProjection> grouped = user.getRole() == UserRole.DTPO
+                ? applications.findCompanyHiringReportByDriveDepartment(ApplicationStatus.SELECTED, departmentId)
+                : departmentId == null
+                    ? applications.findCompanyHiringReport(ApplicationStatus.SELECTED)
+                    : applications.findCompanyHiringReportByStudentDepartment(ApplicationStatus.SELECTED, departmentId);
+        List<List<String>> rows = new ArrayList<>();
+        rows.add(List.of("Company", "Department", "Students hired", "Placement drive", "CTC", "Placement date"));
+        Map<Long, Long> totals = new LinkedHashMap<>();
+        Map<Long, String> companyNames = new LinkedHashMap<>();
+        grouped.forEach(row -> { totals.merge(row.getCompanyId(), row.getHiredCount(), Long::sum); companyNames.put(row.getCompanyId(), row.getCompanyName()); rows.add(List.of(value(row.getCompanyName()), value(row.getDepartmentName()),
+                value(row.getHiredCount()), value(row.getDriveTitle()), formatCtc(row.getCtcAmount(), row.getCtcCurrency()),
+                formatDate(row.getPlacementDate()))); });
+        totals.forEach((companyId, count) -> rows.add(List.of(companyNames.get(companyId), "Overall", value(count), "All drives", "", "")));
         return render(rows, excel);
     }
 
@@ -78,6 +102,38 @@ public class PlacementReportService {
                         value(s.getPhoneNumber()), s.getDepartment().getName(), value(s.getAcademicProgram()), value(s.getCurrentSemester()),
                         value(s.getGraduationYear()), value(s.getCgpa()))));
         return render(rows, excel);
+    }
+
+    private List<PlacementApplication> placedApplications(Long departmentId) {
+        return departmentId == null
+                ? applications.findAllByStatusOrderByAppliedAtAsc(ApplicationStatus.SELECTED)
+                : applications.findAllByStatusAndStudent_Department_IdOrderByAppliedAtAsc(ApplicationStatus.SELECTED, departmentId);
+    }
+
+    private List<PlacementDrive> visitedDrives(UserAccount user, Long departmentId) {
+        if (departmentId == null) {
+            return user.getRole() == UserRole.DTPO
+                    ? drives.findAllByDepartment_IdOrderByApplicationDeadlineAsc(user.getDepartment().getId())
+                    : drives.findAllByOrderByApplicationDeadlineAsc();
+        }
+        List<PlacementDrive> scoped = drives.findAllByDepartment_IdOrderByApplicationDeadlineAsc(departmentId);
+        if (user.getRole() == UserRole.UTPO) {
+            var universityWideDriveIds = applications.findDistinctDriveIdsByStudentDepartmentId(departmentId);
+            drives.findAllByOrderByApplicationDeadlineAsc().stream()
+                    .filter(d -> d.getDepartment() == null && universityWideDriveIds.contains(d.getId()))
+                    .forEach(scoped::add);
+        }
+        return scoped;
+    }
+
+    private Long scopedDepartment(UserAccount user, Long requestedDepartmentId) {
+        if (user.getRole() == UserRole.DTPO) {
+            Long ownDepartmentId = user.getDepartment() == null ? null : user.getDepartment().getId();
+            if (ownDepartmentId == null || (requestedDepartmentId != null && !ownDepartmentId.equals(requestedDepartmentId)))
+                throw forbidden("DTPO cannot export another department");
+            return ownDepartmentId;
+        }
+        return requestedDepartmentId;
     }
 
     private List<String> placedRow(PlacementApplication a) {

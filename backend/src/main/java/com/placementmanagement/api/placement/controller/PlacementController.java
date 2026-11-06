@@ -106,13 +106,17 @@ public class PlacementController {
     public DriveResponse archiveDrive(@PathVariable Long driveId, Authentication auth) { return service.archiveDrive(auth, driveId); }
 
     @GetMapping(value = "/reports/placed.csv", produces = "text/csv")
-    public ResponseEntity<byte[]> placedCsv(Authentication auth) { return report(reports.placed(auth, false), "placed-students.csv", "text/csv"); }
+    public ResponseEntity<byte[]> placedCsv(@RequestParam(required = false) Long departmentId, Authentication auth) { return report(reports.placed(auth, departmentId, false), "placed-students.csv", "text/csv"); }
     @GetMapping(value = "/reports/placed.xlsx", produces = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    public ResponseEntity<byte[]> placedXlsx(Authentication auth) { return report(reports.placed(auth, true), "placed-students.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"); }
+    public ResponseEntity<byte[]> placedXlsx(@RequestParam(required = false) Long departmentId, Authentication auth) { return report(reports.placed(auth, departmentId, true), "placed-students.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"); }
     @GetMapping(value = "/reports/visited-companies.csv", produces = "text/csv")
-    public ResponseEntity<byte[]> visitedCompaniesCsv(Authentication auth) { return report(reports.visitedCompanies(auth, false), "visited-companies.csv", "text/csv"); }
+    public ResponseEntity<byte[]> visitedCompaniesCsv(@RequestParam(required = false) Long departmentId, Authentication auth) { return report(reports.visitedCompanies(auth, departmentId, false), "visited-companies.csv", "text/csv"); }
     @GetMapping(value = "/reports/visited-companies.xlsx", produces = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    public ResponseEntity<byte[]> visitedCompaniesXlsx(Authentication auth) { return report(reports.visitedCompanies(auth, true), "visited-companies.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"); }
+    public ResponseEntity<byte[]> visitedCompaniesXlsx(@RequestParam(required = false) Long departmentId, Authentication auth) { return report(reports.visitedCompanies(auth, departmentId, true), "visited-companies.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"); }
+    @GetMapping(value = "/reports/company-hiring.csv", produces = "text/csv")
+    public ResponseEntity<byte[]> companyHiringCsv(@RequestParam(required = false) Long departmentId, Authentication auth) { return report(reports.companyHiring(auth, departmentId, false), "company-hiring.csv", "text/csv"); }
+    @GetMapping(value = "/reports/company-hiring.xlsx", produces = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    public ResponseEntity<byte[]> companyHiringXlsx(@RequestParam(required = false) Long departmentId, Authentication auth) { return report(reports.companyHiring(auth, departmentId, true), "company-hiring.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"); }
     @GetMapping(value = "/reports/students.csv", produces = "text/csv")
     public ResponseEntity<byte[]> studentsCsv(@RequestParam(required = false) Long departmentId, Authentication auth) { return report(reports.students(auth, departmentId, false), "registered-students.csv", "text/csv"); }
     @GetMapping(value = "/reports/students.xlsx", produces = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
