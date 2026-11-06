@@ -4,7 +4,7 @@ import { Observable } from 'rxjs';
 import { HttpParams } from '@angular/common/http';
 
 import { environment } from '../../../environments/environment';
-import { ApplicationResponse, ApplicationStatus, Company, CompanyRequest, Coordinator, CoordinatorRequest, DashboardSummary, DepartmentInfo, DriveRequest, PlacementDrive, RecruitmentRound, RoundCandidate, RoundRequest, StaffApplication, StaffApplicationPage, StaffStudentPage } from '../models/placement.models';
+import { Announcement, AnnouncementRequest, ApplicationResponse, ApplicationStatus, Company, CompanyRequest, Coordinator, CoordinatorRequest, DashboardSummary, DepartmentInfo, DriveRequest, PlacementAttachment, PlacementDrive, RecruitmentRound, RoundCandidate, RoundRequest, StaffApplication, StaffApplicationPage, StaffStudentPage } from '../models/placement.models';
 
 @Injectable({ providedIn: 'root' })
 export class PlacementService {
@@ -19,9 +19,23 @@ export class PlacementService {
   createCompany(request: CompanyRequest): Observable<Company> {
     return this.http.post<Company>(`${this.apiUrl}/api/placement/companies`, request);
   }
+  updateCompany(companyId: number, request: CompanyRequest): Observable<Company> {
+    return this.http.put<Company>(`${this.apiUrl}/api/placement/companies/${companyId}`, request);
+  }
+  listCompanyAttachments(companyId: number): Observable<PlacementAttachment[]> {
+    return this.http.get<PlacementAttachment[]>(`${this.apiUrl}/api/placement/companies/${companyId}/attachments`);
+  }
+  uploadCompanyAttachment(companyId: number, file: File): Observable<unknown> {
+    const form = new FormData(); form.append('file', file, file.name);
+    return this.http.post(`${this.apiUrl}/api/placement/companies/${companyId}/attachments`, form);
+  }
 
   listDrives(): Observable<PlacementDrive[]> {
     return this.http.get<PlacementDrive[]>(`${this.apiUrl}/api/placement/drives`);
+  }
+
+  listRoundManagementDrives(): Observable<PlacementDrive[]> {
+    return this.http.get<PlacementDrive[]>(`${this.apiUrl}/api/placement/round-management/drives`);
   }
 
   createDrive(request: DriveRequest): Observable<PlacementDrive> {
@@ -34,6 +48,21 @@ export class PlacementService {
 
   cancelDrive(driveId: number): Observable<PlacementDrive> {
     return this.http.post<PlacementDrive>(`${this.apiUrl}/api/placement/drives/${driveId}/cancel`, {});
+  }
+  completeDrive(driveId: number): Observable<PlacementDrive> {
+    return this.http.post<PlacementDrive>(`${this.apiUrl}/api/placement/drives/${driveId}/complete`, {});
+  }
+  archiveDrive(driveId: number): Observable<PlacementDrive> {
+    return this.http.post<PlacementDrive>(`${this.apiUrl}/api/placement/drives/${driveId}/archive`, {});
+  }
+  downloadReport(path: string, departmentId?: number): Observable<Blob> {
+    let params = new HttpParams();
+    if (departmentId !== undefined) params = params.set('departmentId', departmentId);
+    return this.http.get(`${this.apiUrl}/api/placement/reports/${path}`, { params, responseType: 'blob' });
+  }
+  uploadAttachment(driveId: number, file: File): Observable<unknown> {
+    const form = new FormData(); form.append('file', file, file.name);
+    return this.http.post(`${this.apiUrl}/api/placement/drives/${driveId}/attachments`, form);
   }
 
   listApplications(page = 0, size = 25, search = '', status: ApplicationStatus | '' = '', companyId?: number, minCgpa?: number, maxCgpa?: number): Observable<StaffApplicationPage> {
@@ -58,6 +87,14 @@ export class PlacementService {
 
   listDepartments(): Observable<DepartmentInfo[]> {
     return this.http.get<DepartmentInfo[]>(`${this.apiUrl}/api/placement/departments`);
+  }
+
+  listAnnouncements(): Observable<Announcement[]> {
+    return this.http.get<Announcement[]>(`${this.apiUrl}/api/announcements/staff`);
+  }
+
+  publishAnnouncement(request: AnnouncementRequest): Observable<Announcement> {
+    return this.http.post<Announcement>(`${this.apiUrl}/api/announcements`, request);
   }
 
   listCoordinators(): Observable<Coordinator[]> {
@@ -91,5 +128,9 @@ export class PlacementService {
   }
   setFinalOutcome(driveId: number, applicationId: number, outcome: 'SELECTED' | 'REJECTED'): Observable<ApplicationResponse> {
     return this.http.put<ApplicationResponse>(`${this.apiUrl}/api/placement/drives/${driveId}/applications/${applicationId}/outcome`, { outcome });
+  }
+
+  rejectApplication(driveId: number, applicationId: number): Observable<ApplicationResponse> {
+    return this.http.post<ApplicationResponse>(`${this.apiUrl}/api/placement/drives/${driveId}/applications/${applicationId}/reject`, {});
   }
 }

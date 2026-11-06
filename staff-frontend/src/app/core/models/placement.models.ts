@@ -5,6 +5,14 @@ export interface CompanyRequest {
   hrContactName: string;
   hrContactEmail: string;
   hrContactPhone: string;
+  employmentType?: string | null;
+  positionType?: string | null;
+  defaultLocation?: string | null;
+  ctcAmount?: number | null;
+  ctcCurrency?: string | null;
+  stipend?: string | null;
+  otherBenefits?: string | null;
+  bondDetails?: string | null;
 }
 
 export interface Company {
@@ -15,7 +23,17 @@ export interface Company {
   hrContactName: string | null;
   hrContactEmail: string | null;
   hrContactPhone: string | null;
+  employmentType?: string | null;
+  positionType?: string | null;
+  defaultLocation?: string | null;
+  ctcAmount?: number | null;
+  ctcCurrency?: string | null;
+  stipend?: string | null;
+  otherBenefits?: string | null;
+  bondDetails?: string | null;
 }
+
+export interface PlacementAttachment { id: number; fileName: string; contentType: string; sizeBytes: number; }
 
 export interface DriveRequest {
   companyId: number;
@@ -24,12 +42,19 @@ export interface DriveRequest {
   jobDescription: string;
   jobType: 'ONSITE' | 'HYBRID' | 'REMOTE';
   location: string;
-  packageSalary: string;
+  packageSalary?: string | null;
   applicationDeadline: string;
   minimumCgpa: number | null;
   graduationYear: number | null;
   maximumActiveBacklogs: number | null;
   eligibleProgramIds: number[];
+  employmentType?: string | null;
+  positionType?: string | null;
+  ctcAmount?: number | null;
+  ctcCurrency?: string | null;
+  stipend?: string | null;
+  otherBenefits?: string | null;
+  bondDetails?: string | null;
 }
 
 export interface PlacementDrive {
@@ -40,16 +65,23 @@ export interface PlacementDrive {
   jobDescription: string;
   jobType: string;
   location: string;
-  packageSalary: string;
+  packageSalary?: string | null;
   applicationDeadline: string;
-  status: 'DRAFT' | 'PUBLISHED' | 'CLOSED' | 'CANCELLED' | 'ARCHIVED';
+  status: 'DRAFT' | 'PUBLISHED' | 'CLOSED' | 'CANCELLED' | 'COMPLETED' | 'ARCHIVED';
   minimumCgpa: number | null;
   graduationYear: number | null;
   maximumActiveBacklogs: number | null;
   eligibleProgramCodes: string[];
+  employmentType?: string | null;
+  positionType?: string | null;
+  ctcAmount?: number | null;
+  ctcCurrency?: string | null;
+  stipend?: string | null;
+  otherBenefits?: string | null;
+  bondDetails?: string | null;
 }
 
-export type ApplicationStatus = 'APPLIED' | 'SHORTLISTED' | 'REJECTED' | 'SELECTED' | 'WITHDRAWN';
+export type ApplicationStatus = 'APPLIED' | 'SHORTLISTED' | 'APPLICATION_REJECTED' | 'REJECTED' | 'SELECTED' | 'WITHDRAWN';
 
 export interface StaffApplication {
   id: number;
@@ -116,6 +148,24 @@ export interface DepartmentInfo {
   name: string;
 }
 
+export interface AnnouncementRequest {
+  subject: string;
+  title: string;
+  message: string;
+}
+
+export interface Announcement {
+  id: number;
+  subject: string;
+  title: string;
+  message: string;
+  publisherName: string;
+  publisherRole: 'UTPO' | 'DTPO';
+  departmentId: number | null;
+  departmentName: string | null;
+  publishedAt: string;
+}
+
 export interface CoordinatorRequest {
   fullName: string;
   universityEmail: string;
@@ -167,7 +217,7 @@ export interface StudentRoundProgress {
   order: number;
   name: string;
   resultsPublished: boolean;
-  status: 'CLEARED' | 'NOT_CLEARED' | 'AWAITING_RESULT' | 'UPCOMING';
+  status: 'CLEARED' | 'NOT_CLEARED' | 'NOT_APPLICABLE' | 'AWAITING_RESULT' | 'UPCOMING';
 }
 export interface StudentApplicationProgress {
   applicationId: number;

@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.security.core.Authentication;
+import org.springframework.beans.factory.annotation.Autowired;
 import com.placementmanagement.api.auth.entity.*;
 import com.placementmanagement.api.auth.repository.DepartmentRepository;
 import com.placementmanagement.api.auth.repository.StudentRepository;
@@ -30,12 +31,20 @@ public class PlacementService {
     private final AcademicYearRepository academicYears;
     private final StudentRepository students;
     private final PlacementAuthorizationService authorization;
+    private final RecruitmentRoundRepository rounds;
 
     public PlacementService(CompanyRepository companies, PlacementProgramRepository programs, PlacementDriveRepository drives,
             PlacementApplicationRepository applications, DepartmentRepository departments, AcademicYearRepository academicYears, StudentRepository students,
             PlacementAuthorizationService authorization) {
+        this(companies, programs, drives, applications, departments, academicYears, students, authorization, null);
+    }
+
+    @Autowired
+    public PlacementService(CompanyRepository companies, PlacementProgramRepository programs, PlacementDriveRepository drives,
+            PlacementApplicationRepository applications, DepartmentRepository departments, AcademicYearRepository academicYears, StudentRepository students,
+            PlacementAuthorizationService authorization, RecruitmentRoundRepository rounds) {
         this.companies = companies; this.programs = programs; this.drives = drives; this.applications = applications;
-        this.departments = departments; this.academicYears = academicYears; this.students = students; this.authorization = authorization;
+        this.departments = departments; this.academicYears = academicYears; this.students = students; this.authorization = authorization; this.rounds = rounds;
     }
 
     @Transactional
@@ -43,14 +52,30 @@ public class PlacementService {
         authorization.staff(auth);
         if (request == null) throw bad("Company is required");
         String name = required(request.name(), "Company name");
-        return company(companies.save(new Company(name, request.description(), request.website(), request.hrContactName(),
-                request.hrContactEmail(), request.hrContactPhone())));
+        Company company = new Company(name, request.description(), request.website(), request.hrContactName(), request.hrContactEmail(), request.hrContactPhone());
+        company.updateOptionalDetails(request.employmentType(), request.positionType(), request.defaultLocation(), request.ctcAmount(), request.ctcCurrency(),
+                request.stipendType(), request.stipendMinAmount(), request.stipendMaxAmount(), request.stipendCurrency(), request.stipendPaymentPeriod(),
+                request.otherBenefits(), request.bondDetails());
+        company.setStipend(request.stipend());
+        return company(companies.save(company));
     }
 
     @Transactional(readOnly = true)
     public List<CompanyResponse> listCompanies(Authentication auth) {
         authorization.staff(auth);
         return companies.findAll().stream().map(this::company).toList();
+    }
+
+    @Transactional
+    public CompanyResponse updateCompany(Authentication auth, Long companyId, CompanyRequest request) {
+        authorization.staff(auth);
+        if (request == null) throw bad("Company is required");
+        Company company = companies.findById(companyId).orElseThrow(() -> notFound("Company"));
+        String name = required(request.name(), "Company name");
+        company.updateOptionalDetails(request.employmentType(), request.positionType(), request.defaultLocation(), request.ctcAmount(), request.ctcCurrency(),
+                request.stipendType(), request.stipendMinAmount(), request.stipendMaxAmount(), request.stipendCurrency(), request.stipendPaymentPeriod(), request.otherBenefits(), request.bondDetails());
+        company.setStipend(request.stipend());
+        return company(companies.save(company));
     }
 
     @Transactional
@@ -71,9 +96,16 @@ public class PlacementService {
             if (department != null && !department.isActive()) throw bad("Department is inactive");
         }
         Set<PlacementProgram> selected = resolvePrograms(request.eligibleProgramIds());
+        String packageSalary = hasText(request.packageSalary()) ? request.packageSalary().trim()
+                : request.ctcAmount() == null ? null : (hasText(request.ctcCurrency()) ? request.ctcCurrency().trim() + " " : "") + request.ctcAmount();
         PlacementDrive drive = drives.save(new PlacementDrive(academicYear, company, department, user, request.title(), request.jobDescription(),
-                request.jobType(), request.location(), request.packageSalary(), Instant.now(), request.applicationDeadline(), request.minimumCgpa(),
+                request.jobType(), request.location(), packageSalary, Instant.now(), request.applicationDeadline(), request.minimumCgpa(),
                 request.graduationYear(), request.maximumActiveBacklogs(), selected));
+        drive.updateOptionalDetails(request.employmentType(), request.positionType(), request.ctcAmount(), request.ctcCurrency(),
+                request.stipendType(), request.stipendMinAmount(), request.stipendMaxAmount(), request.stipendCurrency(),
+                request.stipendPaymentPeriod(), request.otherBenefits(), request.bondDetails());
+        drive.setStipend(request.stipend());
+        drive = drives.save(drive);
         return drive(drive);
     }
 
@@ -83,7 +115,68 @@ public class PlacementService {
         List<PlacementDrive> result = user.getRole() == UserRole.DTPO
                 ? drives.findAllByDepartment_IdOrderByApplicationDeadlineAsc(requireDepartment(user).getId())
                 : drives.findAllByOrderByApplicationDeadlineAsc();
-        return result.stream().map(this::drive).toList();
+        return result.stream().filter(drive -> !drive.isOperationallyArchived()).map(this::drive).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<DriveResponse> listRoundManagementDrives(Authentication auth) {
+        return listStaffDrives(auth).stream()
+                .filter(drive -> drive.status() != DriveStatus.CANCELLED && drive.status() != DriveStatus.COMPLETED)
+                .toList();
+    }
+
+    @Transactional
+    public DriveResponse archiveDrive(Authentication auth, Long driveId) {
+        UserAccount user = authorization.staff(auth);
+        PlacementDrive drive = drives.findById(driveId).orElseThrow(() -> notFound("Placement drive"));
+        if (user.getRole() == UserRole.DTPO) {
+            Department department = requireDepartment(user);
+            if (drive.getDepartment() == null || !department.getId().equals(drive.getDepartment().getId()))
+                throw forbidden("Drive is outside your department");
+        }
+        if (drive.getStatus() != DriveStatus.CANCELLED && drive.getStatus() != DriveStatus.COMPLETED)
+            throw bad("Only cancelled or completed drives can be archived");
+        if (drive.isOperationallyArchived()) throw conflict("Drive is already archived");
+        drive.archive();
+        return drive(drive);
+    }
+
+    @Transactional
+    public DriveResponse completeDrive(Authentication auth, Long driveId) {
+        UserAccount user = authorization.staff(auth);
+        PlacementDrive drive = drives.findById(driveId).orElseThrow(() -> notFound("Placement drive"));
+        if (user.getRole() == UserRole.DTPO) {
+            Department department = requireDepartment(user);
+            if (drive.getDepartment() == null || !department.getId().equals(drive.getDepartment().getId()))
+                throw forbidden("DTPO cannot complete a drive outside its department");
+        }
+        if (drive.getStatus() != DriveStatus.PUBLISHED)
+            throw bad("Only published drives can be completed");
+        throwIfRecruitmentUnfinished(drive);
+        drive.setStatus(DriveStatus.COMPLETED);
+        return drive(drive);
+    }
+
+    @Transactional
+    public ApplicationResponse rejectApplication(Authentication auth, Long driveId, Long applicationId) {
+        UserAccount user = authorization.staff(auth);
+        PlacementDrive drive = drives.findById(driveId).orElseThrow(() -> notFound("Placement drive"));
+        if (user.getRole() == UserRole.DTPO) {
+            Department department = requireDepartment(user);
+            if (drive.getDepartment() == null || !department.getId().equals(drive.getDepartment().getId()))
+                throw forbidden("Drive is outside your department");
+        }
+        PlacementApplication application = applications.findById(applicationId)
+                .orElseThrow(() -> notFound("Application"));
+        if (!Objects.equals(application.getDrive().getId(), driveId)) throw notFound("Application");
+        if (application.getStatus() == ApplicationStatus.APPLICATION_REJECTED)
+            throw conflict("Application is already rejected");
+        if (application.getStatus() == ApplicationStatus.SELECTED
+                || application.getStatus() == ApplicationStatus.REJECTED
+                || application.getStatus() == ApplicationStatus.WITHDRAWN)
+            throw bad("Only active applications can be rejected");
+        application.setStatus(ApplicationStatus.APPLICATION_REJECTED);
+        return application(applications.save(application));
     }
 
     @Transactional
@@ -241,7 +334,7 @@ public class PlacementService {
         required(drive.getJobDescription(), "Job description");
         required(drive.getJobType(), "Job type");
         required(drive.getLocation(), "Location");
-        required(drive.getPackageSalary(), "Package/salary");
+        if (!hasText(drive.getPackageSalary()) && drive.getCtcAmount() == null) throw bad("CTC amount is required");
         if (!Set.of("ONSITE", "HYBRID", "REMOTE").contains(drive.getJobType().trim().toUpperCase(Locale.ROOT)))
             throw bad("Job type must be ONSITE, HYBRID, or REMOTE");
         if (drive.getApplicationDeadline() == null || drive.getApplicationDeadline().isBefore(Instant.now()))
@@ -254,6 +347,11 @@ public class PlacementService {
         if (drive.getPrograms() == null || drive.getPrograms().stream().anyMatch(program -> program == null || !program.isActive()))
             throw bad("Every selected program must exist and be active");
     }
+    private void throwIfRecruitmentUnfinished(PlacementDrive drive) {
+        if (rounds == null) return;
+        if (rounds.findAllByDrive_IdOrderByOrderAsc(drive.getId()).stream().anyMatch(round -> !round.isResultsPublished()))
+            throw bad("All recruitment round results must be published before completing this drive");
+    }
     private Long scopedDepartmentId(UserAccount user) {
         if (user.getRole() != UserRole.DTPO) return null;
         return requireDepartment(user).getId();
@@ -261,7 +359,8 @@ public class PlacementService {
     private void validateDrive(DriveRequest r) {
         if (r == null) throw bad("Placement drive is required");
         required(r.title(), "Title"); required(r.jobDescription(), "Job description"); required(r.jobType(), "Job type");
-        required(r.location(), "Location"); required(r.packageSalary(), "Package/salary");
+        required(r.location(), "Location");
+        if (!hasText(r.packageSalary()) && r.ctcAmount() == null) throw bad("CTC amount is required");
         if (!Set.of("ONSITE", "HYBRID", "REMOTE").contains(r.jobType().trim().toUpperCase(Locale.ROOT)))
             throw bad("Job type must be ONSITE, HYBRID, or REMOTE");
         if (r.companyId() == null || r.applicationDeadline() == null) throw bad("Company and deadline are required");
@@ -270,8 +369,8 @@ public class PlacementService {
         if (r.maximumActiveBacklogs() != null && r.maximumActiveBacklogs() < 0) throw bad("Maximum active backlogs cannot be negative");
     }
     private Department requireDepartment(UserAccount user) { if (user.getDepartment() == null) throw bad("Staff department is not configured"); return user.getDepartment(); }
-    private CompanyResponse company(Company c) { return new CompanyResponse(c.getId(), c.getName(), c.getDescription(), c.getWebsite(), c.getHrContactName(), c.getHrContactEmail(), c.getHrContactPhone()); }
-    private DriveResponse drive(PlacementDrive d) { return new DriveResponse(d.getId(), company(d.getCompany()), d.getDepartment() == null ? null : d.getDepartment().getId(), d.getTitle(), d.getJobDescription(), d.getJobType(), d.getLocation(), d.getPackageSalary(), d.getApplicationDeadline(), d.getStatus(), d.getMinimumCgpa(), d.getGraduationYear(), d.getMaximumActiveBacklogs(), d.getPrograms().stream().map(PlacementProgram::getCode).toList()); }
+    private CompanyResponse company(Company c) { return new CompanyResponse(c.getId(), c.getName(), c.getDescription(), c.getWebsite(), c.getHrContactName(), c.getHrContactEmail(), c.getHrContactPhone(), c.getEmploymentType(), c.getPositionType(), c.getDefaultLocation(), c.getCtcAmount(), c.getCtcCurrency(), c.getStipendType(), c.getStipendMinAmount(), c.getStipendMaxAmount(), c.getStipendCurrency(), c.getStipendPaymentPeriod(), c.getOtherBenefits(), c.getBondDetails(), c.getStipend()); }
+    private DriveResponse drive(PlacementDrive d) { return new DriveResponse(d.getId(), company(d.getCompany()), d.getDepartment() == null ? null : d.getDepartment().getId(), d.getTitle(), d.getJobDescription(), d.getJobType(), d.getLocation(), d.getPackageSalary(), d.getApplicationDeadline(), d.getStatus(), d.getMinimumCgpa(), d.getGraduationYear(), d.getMaximumActiveBacklogs(), d.getPrograms().stream().map(PlacementProgram::getCode).toList(), d.getEmploymentType(), d.getPositionType(), d.getCtcAmount(), d.getCtcCurrency(), d.getStipendType(), d.getStipendMinAmount(), d.getStipendMaxAmount(), d.getStipendCurrency(), d.getStipendPaymentPeriod(), d.getOtherBenefits(), d.getBondDetails(), d.getStipend()); }
     private ApplicationResponse application(PlacementApplication a) { return new ApplicationResponse(a.getId(), a.getDrive().getId(), a.getStudent().getId(), a.getAppliedAt(), a.getStatus(), a.getOfferStatus(), a.getOfferDecidedAt()); }
     private StaffApplicationResponse staffApplication(StaffApplicationProjection p) {
         return new StaffApplicationResponse(p.getApplicationId(), p.getStudentId(), p.getStudentName(), p.getUniversityEmail(),
@@ -285,6 +384,7 @@ public class PlacementService {
                 p.getCgpa(), p.getApplicationCount());
     }
     private String required(String value, String field) { if (value == null || value.isBlank()) throw bad(field + " is required"); return value.trim(); }
+    private boolean hasText(String value) { return value != null && !value.isBlank(); }
     private ResponseStatusException bad(String message) { return new ResponseStatusException(HttpStatus.BAD_REQUEST, message); }
     private ResponseStatusException forbidden(String message) { return new ResponseStatusException(HttpStatus.FORBIDDEN, message); }
     private ResponseStatusException conflict(String message) { return new ResponseStatusException(HttpStatus.CONFLICT, message); }

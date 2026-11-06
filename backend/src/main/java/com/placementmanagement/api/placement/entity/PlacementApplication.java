@@ -15,6 +15,7 @@ public class PlacementApplication {
     @Enumerated(EnumType.STRING) @Column(nullable = false) private ApplicationStatus status = ApplicationStatus.APPLIED;
     @Enumerated(EnumType.STRING) @Column(name = "offer_status") private OfferStatus offerStatus;
     @Column(name = "offer_decided_at") private Instant offerDecidedAt;
+    @Column(name = "placement_selected_at") private Instant placementSelectedAt;
     protected PlacementApplication() {}
     public PlacementApplication(PlacementDrive drive, Student student) { this.drive = drive; this.student = student; }
     public Long getId() { return id; }
@@ -25,5 +26,7 @@ public class PlacementApplication {
     public void setStatus(ApplicationStatus status) { this.status = status; }
     public OfferStatus getOfferStatus() { return offerStatus; }
     public Instant getOfferDecidedAt() { return offerDecidedAt; }
+    public Instant getPlacementSelectedAt() { return placementSelectedAt; }
+    public void markSelected() { if (placementSelectedAt == null) placementSelectedAt = Instant.now(); }
     public void decideOffer(OfferStatus decision) { this.offerStatus = decision; this.offerDecidedAt = Instant.now(); }
 }

@@ -4,20 +4,29 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:placement_management_app/main.dart';
+import 'package:placement_management_app/models/announcement.dart';
 import 'package:placement_management_app/models/placement_models.dart';
 import 'package:placement_management_app/screens/student_home.dart';
 import 'package:placement_management_app/services/placement_api.dart';
 
 void main() {
-  testWidgets('shows the authentication screen', (WidgetTester tester) async {
+  testWidgets('shows the welcome and authentication screens', (WidgetTester tester) async {
     await tester.pumpWidget(const PlacementManagementApp());
 
-    expect(find.text('Placement Management System'), findsOneWidget);
+    expect(find.text('“चारुसैट है तो सक्सेस है”'), findsOneWidget);
+    expect(find.text('Discover placement opportunities at CHARUSAT.'), findsOneWidget);
     expect(find.text('Sign in'), findsOneWidget);
-    expect(find.text('New student? Create an account'), findsOneWidget);
+    expect(find.text('Create an account'), findsOneWidget);
+
+    await tester.tap(find.text('Sign in'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Career Development and Placement Cell'), findsOneWidget);
+    expect(find.text('Placement Management System'), findsOneWidget);
+    expect(find.text('Welcome back'), findsOneWidget);
   });
 
-  testWidgets('student shell switches between the three local destinations', (
+testWidgets('student shell switches between the four local destinations', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
@@ -35,6 +44,36 @@ void main() {
     await tester.tap(find.text('History'));
     await tester.pumpAndSettle();
     expect(find.text('Application history'), findsOneWidget);
+
+    await tester.tap(find.text('Announcements'));
+    await tester.pumpAndSettle();
+    expect(find.text('No announcements yet'), findsOneWidget);
+  });
+
+  testWidgets('theme toggle switches repeatedly between dark and light mode', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const PlacementManagementApp());
+    await tester.tap(find.text('Sign in'));
+    await tester.pumpAndSettle();
+
+    // Initial state: Light mode
+    expect(find.byTooltip('Switch to dark mode'), findsOneWidget);
+
+    // Tap 1: Toggle to Dark mode
+    await tester.tap(find.byTooltip('Switch to dark mode'));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Switch to light mode'), findsOneWidget);
+
+    // Tap 2: Toggle back to Light mode
+    await tester.tap(find.byTooltip('Switch to light mode'));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Switch to dark mode'), findsOneWidget);
+
+    // Tap 3: Toggle to Dark mode again
+    await tester.tap(find.byTooltip('Switch to dark mode'));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Switch to light mode'), findsOneWidget);
   });
 }
 
@@ -55,4 +94,7 @@ class _FakePlacementApi extends PlacementApi {
 
   @override
   Future<Uint8List?> fetchProfilePhoto() async => null;
+
+  @override
+  Future<List<Announcement>> fetchAnnouncements() async => const [];
 }

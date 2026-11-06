@@ -47,6 +47,7 @@ import com.placementmanagement.api.placement.repository.CompanyRepository;
 import com.placementmanagement.api.placement.repository.PlacementApplicationRepository;
 import com.placementmanagement.api.placement.repository.PlacementDriveRepository;
 import com.placementmanagement.api.placement.repository.PlacementProgramRepository;
+import com.placementmanagement.api.placement.repository.RecruitmentRoundRepository;
 import com.placementmanagement.api.placement.service.PlacementAuthorizationService;
 import com.placementmanagement.api.placement.service.PlacementService;
 
@@ -60,13 +61,36 @@ class PlacementServiceTest {
     @Mock AcademicYearRepository academicYears;
     @Mock StudentRepository students;
     @Mock PlacementAuthorizationService authorization;
+    @Mock RecruitmentRoundRepository rounds;
     @Mock Authentication authentication;
     private PlacementService service;
 
     @BeforeEach
     void setUp() {
         service = new PlacementService(companies, programs, drives, applications, departments,
-                academicYears, students, authorization);
+                academicYears, students, authorization, rounds);
+    }
+
+    @Test
+    void staffCanCompletePublishedDriveAfterRoundResultsArePublished() {
+        UserAccount utpo = mock(UserAccount.class);
+        PlacementDrive drive = mock(PlacementDrive.class);
+        Company company = mock(Company.class);
+        when(authorization.staff(authentication)).thenReturn(utpo);
+        when(utpo.getRole()).thenReturn(UserRole.UTPO);
+        when(drives.findById(19L)).thenReturn(Optional.of(drive));
+        when(drive.getStatus()).thenReturn(DriveStatus.PUBLISHED, DriveStatus.COMPLETED);
+        when(drive.getId()).thenReturn(19L);
+        when(drive.getCompany()).thenReturn(company);
+        when(company.getId()).thenReturn(5L);
+        when(company.getName()).thenReturn("Acme");
+        when(drive.getPrograms()).thenReturn(Set.of());
+        when(rounds.findAllByDrive_IdOrderByOrderAsc(19L)).thenReturn(List.of());
+
+        DriveResponse response = service.completeDrive(authentication, 19L);
+
+        verify(drive).setStatus(DriveStatus.COMPLETED);
+        assertEquals(DriveStatus.COMPLETED, response.status());
     }
 
     @Test
@@ -228,6 +252,49 @@ class PlacementServiceTest {
         service.cancelDrive(authentication, 9L);
 
         verify(drive).setStatus(DriveStatus.CANCELLED);
+    }
+
+    @Test
+    void staffRejectionUpdatesOnlyTheApplicationWithSeparateStatus() {
+        UserAccount dtpo = mock(UserAccount.class);
+        Department department = department(2L);
+        PlacementDrive drive = mock(PlacementDrive.class);
+        PlacementApplication application = mock(PlacementApplication.class);
+        Student student = mock(Student.class);
+        when(authorization.staff(authentication)).thenReturn(dtpo);
+        when(dtpo.getRole()).thenReturn(UserRole.DTPO);
+        when(dtpo.getDepartment()).thenReturn(department);
+        when(drives.findById(9L)).thenReturn(Optional.of(drive));
+        when(drive.getId()).thenReturn(9L);
+        when(drive.getDepartment()).thenReturn(department);
+        when(applications.findById(30L)).thenReturn(Optional.of(application));
+        when(application.getDrive()).thenReturn(drive);
+        when(application.getId()).thenReturn(30L);
+        when(application.getStudent()).thenReturn(student);
+        when(student.getId()).thenReturn(44L);
+        when(application.getAppliedAt()).thenReturn(Instant.now());
+        when(application.getStatus()).thenReturn(ApplicationStatus.APPLIED);
+        when(applications.save(application)).thenReturn(application);
+
+        service.rejectApplication(authentication, 9L, 30L);
+
+        verify(application).setStatus(ApplicationStatus.APPLICATION_REJECTED);
+        verify(applications).save(application);
+    }
+
+    @Test
+    void roundManagementExcludesCancelledDrivesButKeepsPublishedDrives() {
+        UserAccount utpo = mock(UserAccount.class);
+        when(authorization.staff(authentication)).thenReturn(utpo);
+        when(utpo.getRole()).thenReturn(UserRole.UTPO);
+        PlacementDrive active = drive(DriveStatus.PUBLISHED, null, 1, 2029, "MCA");
+        PlacementDrive cancelled = drive(DriveStatus.CANCELLED, null, 1, 2029, "MCA");
+        when(drives.findAllByOrderByApplicationDeadlineAsc()).thenReturn(List.of(active, cancelled));
+
+        List<DriveResponse> result = service.listRoundManagementDrives(authentication);
+
+        assertEquals(1, result.size());
+        assertEquals(DriveStatus.PUBLISHED, result.get(0).status());
     }
 
     @Test

@@ -6,11 +6,14 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import com.placementmanagement.api.placement.entity.ApplicationStatus;
 import com.placementmanagement.api.placement.dto.PlacementDtos.*;
 import com.placementmanagement.api.placement.service.PlacementService;
 import com.placementmanagement.api.placement.service.CoordinatorService;
 import com.placementmanagement.api.placement.service.RecruitmentService;
+import com.placementmanagement.api.placement.service.PlacementReportService;
 
 @RestController
 @RequestMapping("/api/placement")
@@ -18,10 +21,12 @@ public class PlacementController {
     private final PlacementService service;
     private final CoordinatorService coordinators;
     private final RecruitmentService recruitment;
-    public PlacementController(PlacementService service, CoordinatorService coordinators, RecruitmentService recruitment) {
+    private final PlacementReportService reports;
+    public PlacementController(PlacementService service, CoordinatorService coordinators, RecruitmentService recruitment, PlacementReportService reports) {
         this.service = service;
         this.coordinators = coordinators;
         this.recruitment = recruitment;
+        this.reports = reports;
     }
 
     @PostMapping("/coordinators") @ResponseStatus(HttpStatus.CREATED)
@@ -83,18 +88,51 @@ public class PlacementController {
     public CompanyResponse createCompany(@RequestBody CompanyRequest request, Authentication auth) { return service.createCompany(auth, request); }
     @GetMapping("/companies")
     public List<CompanyResponse> companies(Authentication auth) { return service.listCompanies(auth); }
+    @PutMapping("/companies/{companyId}")
+    public CompanyResponse updateCompany(@PathVariable Long companyId, @RequestBody CompanyRequest request, Authentication auth) { return service.updateCompany(auth, companyId, request); }
     @PostMapping("/drives") @ResponseStatus(HttpStatus.CREATED)
     public DriveResponse createDrive(@RequestBody DriveRequest request, Authentication auth) { return service.createDrive(auth, request); }
     @GetMapping("/drives")
     public List<DriveResponse> staffDrives(Authentication auth) { return service.listStaffDrives(auth); }
+    @GetMapping("/round-management/drives")
+    public List<DriveResponse> roundManagementDrives(Authentication auth) { return service.listRoundManagementDrives(auth); }
     @PostMapping("/drives/{driveId}/publish")
     public DriveResponse publishDrive(@PathVariable Long driveId, Authentication auth) { return service.publishDrive(auth, driveId); }
     @PostMapping("/drives/{driveId}/cancel")
     public DriveResponse cancelDrive(@PathVariable Long driveId, Authentication auth) { return service.cancelDrive(auth, driveId); }
+    @PostMapping("/drives/{driveId}/complete")
+    public DriveResponse completeDrive(@PathVariable Long driveId, Authentication auth) { return service.completeDrive(auth, driveId); }
+    @PostMapping("/drives/{driveId}/archive")
+    public DriveResponse archiveDrive(@PathVariable Long driveId, Authentication auth) { return service.archiveDrive(auth, driveId); }
+
+    @GetMapping(value = "/reports/placed.csv", produces = "text/csv")
+    public ResponseEntity<byte[]> placedCsv(@RequestParam(required = false) Long departmentId, Authentication auth) { return report(reports.placed(auth, departmentId, false), "placed-students.csv", "text/csv"); }
+    @GetMapping(value = "/reports/placed.xlsx", produces = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    public ResponseEntity<byte[]> placedXlsx(@RequestParam(required = false) Long departmentId, Authentication auth) { return report(reports.placed(auth, departmentId, true), "placed-students.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"); }
+    @GetMapping(value = "/reports/visited-companies.csv", produces = "text/csv")
+    public ResponseEntity<byte[]> visitedCompaniesCsv(@RequestParam(required = false) Long departmentId, Authentication auth) { return report(reports.visitedCompanies(auth, departmentId, false), "visited-companies.csv", "text/csv"); }
+    @GetMapping(value = "/reports/visited-companies.xlsx", produces = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    public ResponseEntity<byte[]> visitedCompaniesXlsx(@RequestParam(required = false) Long departmentId, Authentication auth) { return report(reports.visitedCompanies(auth, departmentId, true), "visited-companies.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"); }
+    @GetMapping(value = "/reports/company-hiring.csv", produces = "text/csv")
+    public ResponseEntity<byte[]> companyHiringCsv(@RequestParam(required = false) Long departmentId, Authentication auth) { return report(reports.companyHiring(auth, departmentId, false), "company-hiring.csv", "text/csv"); }
+    @GetMapping(value = "/reports/company-hiring.xlsx", produces = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    public ResponseEntity<byte[]> companyHiringXlsx(@RequestParam(required = false) Long departmentId, Authentication auth) { return report(reports.companyHiring(auth, departmentId, true), "company-hiring.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"); }
+    @GetMapping(value = "/reports/students.csv", produces = "text/csv")
+    public ResponseEntity<byte[]> studentsCsv(@RequestParam(required = false) Long departmentId, Authentication auth) { return report(reports.students(auth, departmentId, false), "registered-students.csv", "text/csv"); }
+    @GetMapping(value = "/reports/students.xlsx", produces = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    public ResponseEntity<byte[]> studentsXlsx(@RequestParam(required = false) Long departmentId, Authentication auth) { return report(reports.students(auth, departmentId, true), "registered-students.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"); }
+
+    private ResponseEntity<byte[]> report(byte[] body, String filename, String type) {
+        return ResponseEntity.ok().contentType(MediaType.parseMediaType(type))
+                .header("Content-Disposition", "attachment; filename=\"" + filename + "\"").body(body);
+    }
     @GetMapping("/student/drives")
     public List<DriveResponse> studentDrives(Authentication auth) { return service.listStudentDrives(auth); }
     @PostMapping("/student/drives/{driveId}/applications") @ResponseStatus(HttpStatus.CREATED)
     public ApplicationResponse apply(@PathVariable Long driveId, Authentication auth) { return service.apply(auth, driveId); }
+    @PostMapping("/drives/{driveId}/applications/{applicationId}/reject")
+    public ApplicationResponse rejectApplication(@PathVariable Long driveId, @PathVariable Long applicationId,
+            Authentication auth) { return service.rejectApplication(auth, driveId, applicationId); }
     @GetMapping("/student/applications")
     public List<ApplicationResponse> applications(Authentication auth) { return service.myApplications(auth); }
     @PutMapping("/student/applications/{applicationId}/offer")

@@ -25,6 +25,18 @@ public class PlacementDrive {
     @Column(name = "application_closes_at", nullable = false) private Instant applicationDeadline;
     @Column(name = "scheduled_at") private Instant scheduledAt;
     @Column(name = "instructions") private String instructions;
+    @Column(name = "employment_type") private String employmentType;
+    @Column(name = "position_type") private String positionType;
+    @Column(name = "ctc_amount") private BigDecimal ctcAmount;
+    @Column(name = "ctc_currency") private String ctcCurrency;
+    @Column(name = "stipend_type") private String stipendType;
+    @Column(name = "stipend_min_amount") private BigDecimal stipendMinAmount;
+    @Column(name = "stipend_max_amount") private BigDecimal stipendMaxAmount;
+    @Column(name = "stipend_currency") private String stipendCurrency;
+    @Column(name = "stipend_payment_period") private String stipendPaymentPeriod;
+    @Column(name = "other_benefits") private String otherBenefits;
+    @Column(name = "bond_details") private String bondDetails;
+    @Column(name = "stipend") private String stipend;
     @Enumerated(EnumType.STRING) @Column(nullable = false) private DriveStatus status;
     @Column(name = "minimum_cgpa") private BigDecimal minimumCgpa;
     @Column(name = "graduation_year") private Short graduationYear;
@@ -34,6 +46,8 @@ public class PlacementDrive {
     private Set<PlacementProgram> programs = new LinkedHashSet<>();
     @Column(name = "created_at", nullable = false, updatable = false) private Instant createdAt = Instant.now();
     @Column(name = "updated_at", nullable = false) private Instant updatedAt = Instant.now();
+    @Column(name = "operationally_archived", nullable = false) private boolean operationallyArchived;
+    @Column(name = "archived_at") private Instant archivedAt;
     protected PlacementDrive() {}
     public PlacementDrive(AcademicYear academicYear, Company company, Department department, UserAccount createdBy, String title, String jobDescription,
             String jobType, String location, String packageSalary, Instant opensAt, Instant deadline, BigDecimal minimumCgpa,
@@ -60,6 +74,30 @@ public class PlacementDrive {
     public Short getGraduationYear() { return graduationYear; }
     public Integer getMaximumActiveBacklogs() { return maximumActiveBacklogs; }
     public String getInstructions() { return instructions; }
+    public String getEmploymentType() { return employmentType; }
+    public String getPositionType() { return positionType; }
+    public BigDecimal getCtcAmount() { return ctcAmount; }
+    public String getCtcCurrency() { return ctcCurrency; }
+    public String getStipendType() { return stipendType; }
+    public BigDecimal getStipendMinAmount() { return stipendMinAmount; }
+    public BigDecimal getStipendMaxAmount() { return stipendMaxAmount; }
+    public String getStipendCurrency() { return stipendCurrency; }
+    public String getStipendPaymentPeriod() { return stipendPaymentPeriod; }
+    public String getOtherBenefits() { return otherBenefits; }
+    public String getBondDetails() { return bondDetails; }
+    public String getStipend() { return stipend; }
+    public void updateOptionalDetails(String employmentType, String positionType, BigDecimal ctcAmount, String ctcCurrency,
+            String stipendType, BigDecimal stipendMinAmount, BigDecimal stipendMaxAmount, String stipendCurrency,
+            String stipendPaymentPeriod, String otherBenefits, String bondDetails) {
+        this.employmentType = employmentType; this.positionType = positionType; this.ctcAmount = ctcAmount; this.ctcCurrency = ctcCurrency;
+        this.stipendType = stipendType; this.stipendMinAmount = stipendMinAmount; this.stipendMaxAmount = stipendMaxAmount;
+        this.stipendCurrency = stipendCurrency; this.stipendPaymentPeriod = stipendPaymentPeriod;
+        this.otherBenefits = otherBenefits; this.bondDetails = bondDetails;
+    }
     public Set<PlacementProgram> getPrograms() { return programs; }
     public void setStatus(DriveStatus status) { this.status = status; }
+    public void setStipend(String stipend) { this.stipend = stipend; }
+    public boolean isOperationallyArchived() { return operationallyArchived; }
+    public Instant getArchivedAt() { return archivedAt; }
+    public void archive() { this.operationallyArchived = true; this.archivedAt = Instant.now(); this.updatedAt = Instant.now(); }
 }

@@ -1,2 +1,2 @@
 package com.placementmanagement.api.placement.entity;
-public enum ApplicationStatus { APPLIED, SHORTLISTED, REJECTED, SELECTED, WITHDRAWN }
+public enum ApplicationStatus { APPLIED, SHORTLISTED, APPLICATION_REJECTED, REJECTED, SELECTED, WITHDRAWN }
