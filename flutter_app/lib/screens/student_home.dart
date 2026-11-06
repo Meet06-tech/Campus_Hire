@@ -7,6 +7,7 @@ import '../models/placement_models.dart';
 import '../services/placement_api.dart';
 import 'profile_page.dart';
 import 'settings_page.dart';
+import 'announcements_page.dart';
 
 class StudentHomeShell extends StatefulWidget {
   const StudentHomeShell({
@@ -88,6 +89,11 @@ class _StudentHomeShellState extends State<StudentHomeShell>
         title: 'Application history',
         historyOnly: true,
       ),
+      AnnouncementsPage(
+        key: ValueKey('announcements-$_refreshKey'),
+        api: widget.api,
+        onSessionExpired: widget.onLogout,
+      ),
     ];
 
     return Scaffold(
@@ -134,6 +140,11 @@ class _StudentHomeShellState extends State<StudentHomeShell>
             icon: Icon(Icons.history_outlined),
             selectedIcon: Icon(Icons.history_rounded),
             label: 'History',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.campaign_outlined),
+            selectedIcon: Icon(Icons.campaign_rounded),
+            label: 'Announcements',
           ),
         ],
       ),

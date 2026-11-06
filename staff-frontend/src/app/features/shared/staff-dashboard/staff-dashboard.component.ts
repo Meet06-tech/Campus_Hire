@@ -6,9 +6,9 @@ import { finalize, forkJoin, of } from 'rxjs';
 import { AuthService } from '../../../core/services/auth.service';
 import { PlacementService } from '../../../core/services/placement.service';
 import { MeResponse, StaffRole } from '../../../core/models/auth.models';
-import { ApplicationStatus, Company, CompanyRequest, Coordinator, CoordinatorRequest, DashboardSummary, DepartmentInfo, DriveRequest, PlacementAttachment, PlacementDrive, RecruitmentRound, RoundCandidate, RoundRequest, StaffApplication, StaffStudent } from '../../../core/models/placement.models';
+import { Announcement, AnnouncementRequest, ApplicationStatus, Company, CompanyRequest, Coordinator, CoordinatorRequest, DashboardSummary, DepartmentInfo, DriveRequest, PlacementAttachment, PlacementDrive, RecruitmentRound, RoundCandidate, RoundRequest, StaffApplication, StaffStudent } from '../../../core/models/placement.models';
 
-type DashboardSection = 'overview' | 'drives' | 'companies' | 'applications' | 'students' | 'reports' | 'coordinators' | 'rounds';
+type DashboardSection = 'overview' | 'drives' | 'companies' | 'applications' | 'students' | 'reports' | 'announcements' | 'coordinators' | 'rounds';
 
 interface DashboardNavItem {
   id: DashboardSection;
@@ -39,7 +39,8 @@ export class StaffDashboardComponent implements OnInit {
     { id: 'companies', label: 'Companies', icon: '◈' },
     { id: 'applications', label: 'Applied students', icon: '✓' },
     { id: 'students', label: 'Students', icon: '♙' },
-    { id: 'reports', label: 'Reports', icon: '▥' }
+    { id: 'reports', label: 'Reports', icon: '▥' },
+    { id: 'announcements', label: 'Announcements', icon: '!' }
   ];
 
   user = signal<MeResponse | null>(null);
@@ -50,6 +51,7 @@ export class StaffDashboardComponent implements OnInit {
   students = signal<StaffStudent[]>([]);
   coordinators = signal<Coordinator[]>([]);
   departments = signal<DepartmentInfo[]>([]);
+  announcements = signal<Announcement[]>([]);
   rounds = signal<RecruitmentRound[]>([]);
   candidates = signal<RoundCandidate[]>([]);
   selectedDrive = signal<PlacementDrive | null>(null);
@@ -71,6 +73,7 @@ export class StaffDashboardComponent implements OnInit {
   applicationSearch = signal('');
   reportDownloading = signal<string | null>(null);
   reportDepartmentId = signal<number | null>(null);
+  announcementForm: AnnouncementRequest = { subject: '', title: '', message: '' };
 
   companyForm: CompanyRequest = this.emptyCompany();
   driveForm: DriveRequest = this.emptyDrive();
@@ -108,9 +111,10 @@ export class StaffDashboardComponent implements OnInit {
       students: this.placementService.listStudents(0, 100),
       summary: this.placementService.dashboardSummary(),
       departments: this.role === 'UTPO' ? this.placementService.listDepartments() : of([] as DepartmentInfo[]),
-      coordinators: this.role === 'UTPO' ? this.placementService.listCoordinators() : of([] as Coordinator[])
+      coordinators: this.role === 'UTPO' ? this.placementService.listCoordinators() : of([] as Coordinator[]),
+      announcements: this.placementService.listAnnouncements()
     }).subscribe({
-      next: ({ user, companies, drives, applications, students, summary, departments, coordinators }) => {
+      next: ({ user, companies, drives, applications, students, summary, departments, coordinators, announcements }) => {
         this.user.set(user);
         this.companies.set(companies);
         this.drives.set(drives);
@@ -119,6 +123,7 @@ export class StaffDashboardComponent implements OnInit {
         this.summary.set(summary);
         this.departments.set(departments);
         this.coordinators.set(coordinators);
+        this.announcements.set(announcements);
         this.loading.set(false);
       },
       error: (error: { status?: number }) => {
@@ -416,6 +421,27 @@ export class StaffDashboardComponent implements OnInit {
         this.finishSave('Department coordinator created successfully.');
       },
       error: error => this.failSave(this.apiError(error, 'Coordinator could not be created. Check the email, department, and password.'))
+    });
+  }
+
+  publishAnnouncement(): void {
+    const request = {
+      subject: this.announcementForm.subject.trim(),
+      title: this.announcementForm.title.trim(),
+      message: this.announcementForm.message.trim()
+    };
+    if (!request.subject || !request.title || !request.message) {
+      this.errorMessage.set('Subject, title, and message are required.');
+      return;
+    }
+    this.startSave();
+    this.placementService.publishAnnouncement(request).subscribe({
+      next: announcement => {
+        this.announcements.update(items => [announcement, ...items]);
+        this.announcementForm = { subject: '', title: '', message: '' };
+        this.finishSave('Announcement published successfully.');
+      },
+      error: error => this.failSave(this.apiError(error, 'The announcement could not be published.'))
     });
   }
 
