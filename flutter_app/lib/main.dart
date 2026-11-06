@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'navigation/app_navigation.dart';
-import 'screens/auth_page.dart';
+import 'screens/welcome_screen.dart';
 import 'services/placement_api.dart';
 import 'theme/app_theme.dart';
 
@@ -29,34 +29,46 @@ class _PlacementManagementAppState extends State<PlacementManagementApp> {
   }
 
   Future<void> _loadTheme() async {
-    final preferences = await SharedPreferences.getInstance();
-    if (!mounted) return;
-    setState(
-      () => _themeMode = preferences.getBool('dark_mode') == true
-          ? ThemeMode.dark
-          : ThemeMode.light,
-    );
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      if (!mounted) return;
+      setState(
+        () => _themeMode = preferences.getBool('dark_mode') == true
+            ? ThemeMode.dark
+            : ThemeMode.light,
+      );
+    } catch (_) {
+      // Graceful fallback if SharedPreferences is unavailable in mock tests
+    }
   }
 
   Future<void> _setThemeMode(ThemeMode mode) async {
     setState(() => _themeMode = mode);
-    final preferences = await SharedPreferences.getInstance();
-    await preferences.setBool('dark_mode', mode == ThemeMode.dark);
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setBool('dark_mode', mode == ThemeMode.dark);
+    } catch (_) {
+      // Graceful fallback
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      navigatorKey: appNavigatorKey,
-      title: 'CampusHire',
-      theme: AppTheme.light(),
-      darkTheme: AppTheme.dark(),
+    return AppThemeScope(
       themeMode: _themeMode,
-      home: AuthPage(
-        api: widget.api ?? PlacementApi(),
+      onThemeModeChanged: _setThemeMode,
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        navigatorKey: appNavigatorKey,
+        title: 'CampusHire',
+        theme: AppTheme.light(),
+        darkTheme: AppTheme.dark(),
         themeMode: _themeMode,
-        onThemeModeChanged: _setThemeMode,
+        home: WelcomeScreen(
+          api: widget.api ?? PlacementApi(),
+          themeMode: _themeMode,
+          onThemeModeChanged: _setThemeMode,
+        ),
       ),
     );
   }

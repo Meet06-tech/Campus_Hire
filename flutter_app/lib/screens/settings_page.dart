@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_theme.dart';
+
 class SettingsPage extends StatelessWidget {
   const SettingsPage({
     super.key,
@@ -15,18 +17,24 @@ class SettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final dark = Theme.of(context).brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(
+        title: const Text('Settings'),
+      ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
         children: [
           Text(
-            'Preferences',
-            style: Theme.of(context).textTheme.titleLarge
-                ?.copyWith(fontWeight: FontWeight.w800),
+            'Appearance',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: colors.primary,
+                  letterSpacing: 0.5,
+                ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Card(
             child: SwitchListTile.adaptive(
               contentPadding: const EdgeInsets.symmetric(
@@ -36,31 +44,46 @@ class SettingsPage extends StatelessWidget {
               secondary: CircleAvatar(
                 backgroundColor: colors.primaryContainer,
                 child: Icon(
-                  dark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                  isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
                   color: colors.primary,
                 ),
               ),
               title: const Text(
                 'Dark mode',
-                style: TextStyle(fontWeight: FontWeight.w800),
+                style: TextStyle(fontWeight: FontWeight.w700),
               ),
               subtitle: Text(
-                dark
+                isDark
                     ? 'Easier on the eyes at night'
-                    : 'Bright and clear during the day',
+                    : 'Clean and bright during the day',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: colors.onSurfaceVariant,
+                ),
               ),
-              value: dark,
-              onChanged: (value) =>
-                  onThemeChanged(value ? ThemeMode.dark : ThemeMode.light),
+              value: isDark,
+              activeTrackColor: colors.primary,
+              onChanged: (_) {
+                final scope = AppThemeScope.maybeOf(context);
+                if (scope != null) {
+                  scope.toggleTheme(context);
+                } else {
+                  onThemeChanged(isDark ? ThemeMode.light : ThemeMode.dark);
+                }
+              },
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 28),
+
           Text(
-            'Account',
-            style: Theme.of(context).textTheme.titleLarge
-                ?.copyWith(fontWeight: FontWeight.w800),
+            'Account & Security',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: colors.primary,
+                  letterSpacing: 0.5,
+                ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Card(
             child: ListTile(
               contentPadding: const EdgeInsets.symmetric(
@@ -76,18 +99,57 @@ class SettingsPage extends StatelessWidget {
               ),
               title: const Text(
                 'Sign out',
-                style: TextStyle(fontWeight: FontWeight.w800),
+                style: TextStyle(fontWeight: FontWeight.w700),
               ),
-              subtitle: const Text('End your current session on this device'),
+              subtitle: Text(
+                'End your current student session on this device',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: colors.onSurfaceVariant,
+                ),
+              ),
               trailing: const Icon(Icons.chevron_right_rounded),
               onTap: onLogout,
             ),
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 36),
+
+          // CDPC & CHARUSAT Placement cell footer
           Center(
-            child: Text(
-              'CampusHire · Placement Management',
-              style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
+            child: Column(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.asset(
+                    'assets/images/cdpc_logo_square.jpg',
+                    height: 40,
+                    width: 40,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => Icon(
+                      Icons.school_rounded,
+                      size: 28,
+                      color: colors.primary,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'CHARUSAT · CDPC',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    color: colors.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Career Development and Placement Cell',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              ],
             ),
           ),
         ],

@@ -3,15 +3,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CampusHire Design System — Modern SaaS + Fintech Hybrid
+// CampusHire Design System — CHARUSAT & CDPC Placement Management System
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Core brand colors used across both light and dark themes.
+/// Core brand colors for CHARUSAT University and CDPC.
 abstract final class CHColors {
-  // Primary brand gradient
-  static const Color electricIndigo = Color(0xFF635BFF);
-  static const Color deepViolet = Color(0xFF4F46E5);
-  static const Color royalBlue = Color(0xFF3B82F6);
+  // Official CHARUSAT & CDPC Brand Colors
+  static const Color charusatBlue = Color(0xFF0060AA);
+  static const Color charusatBlueDark = Color(0xFF004B87);
+  static const Color charusatBlueLight = Color(0xFFE8F1FA);
+  static const Color cdpcOrange = Color(0xFFEF781C);
+  static const Color cdpcOrangeLight = Color(0xFFFFF3E6);
+
+  // Hybrid & Primary aliases
+  static const Color primaryBlue = charusatBlue;
+  static const Color electricIndigo = Color(0xFF0060AA); // Aligned to official CHARUSAT blue
+  static const Color deepViolet = Color(0xFF004B87);
+  static const Color royalBlue = Color(0xFF0060AA);
 
   // Accent / CTA
   static const Color emerald = Color(0xFF10B981);
@@ -23,14 +31,14 @@ abstract final class CHColors {
   static const Color success = Color(0xFF22C55E);
   static const Color warning = Color(0xFFF59E0B);
   static const Color error = Color(0xFFEF4444);
-  static const Color info = Color(0xFF3B82F6);
+  static const Color info = Color(0xFF0060AA);
 
   // Light theme surfaces
-  static const Color lightBg = Color(0xFFF8F9FC);
+  static const Color lightBg = Color(0xFFF8FAFC);
   static const Color lightSurface = Color(0xFFFFFFFF);
-  static const Color lightSurfaceDim = Color(0xFFF1F3F9);
+  static const Color lightSurfaceDim = Color(0xFFF1F5F9);
   static const Color lightCard = Color(0xFFFFFFFF);
-  static const Color lightBorder = Color(0xFFE5E7EB);
+  static const Color lightBorder = Color(0xFFE2E8F0);
 
   // Dark theme surfaces
   static const Color darkBg = Color(0xFF0B0F1A);
@@ -40,22 +48,28 @@ abstract final class CHColors {
   static const Color darkBorder = Color(0xFF374151);
 
   // Text
-  static const Color lightTextPrimary = Color(0xFF111827);
-  static const Color lightTextSecondary = Color(0xFF6B7280);
-  static const Color lightTextTertiary = Color(0xFF9CA3AF);
+  static const Color lightTextPrimary = Color(0xFF0F172A);
+  static const Color lightTextSecondary = Color(0xFF64748B);
+  static const Color lightTextTertiary = Color(0xFF94A3B8);
   static const Color darkTextPrimary = Color(0xFFF9FAFB);
   static const Color darkTextSecondary = Color(0xFF9CA3AF);
   static const Color darkTextTertiary = Color(0xFF6B7280);
 
   // Brand gradients
   static const LinearGradient primaryGradient = LinearGradient(
-    colors: [electricIndigo, royalBlue],
+    colors: [charusatBlue, Color(0xFF0284C7)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static const LinearGradient cdpcGradient = LinearGradient(
+    colors: [charusatBlue, cdpcOrange],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
   static const LinearGradient heroGradient = LinearGradient(
-    colors: [Color(0xFF635BFF), Color(0xFF3B82F6), Color(0xFF06B6D4)],
+    colors: [charusatBlue, Color(0xFF0284C7), Color(0xFF0EA5E9)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
@@ -79,7 +93,7 @@ abstract final class CHColors {
   );
 
   static const LinearGradient darkHeroGradient = LinearGradient(
-    colors: [Color(0xFF4338CA), Color(0xFF6366F1), Color(0xFF818CF8)],
+    colors: [Color(0xFF1E3A8A), Color(0xFF2563EB), Color(0xFF60A5FA)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
@@ -230,12 +244,12 @@ abstract final class CHRadius {
 abstract final class CHShadows {
   static List<BoxShadow> soft(Color color) => [
         BoxShadow(
-          color: color.withValues(alpha: 0.08),
+          color: color.withValues(alpha: 0.06),
           blurRadius: 16,
           offset: const Offset(0, 4),
         ),
         BoxShadow(
-          color: color.withValues(alpha: 0.04),
+          color: color.withValues(alpha: 0.03),
           blurRadius: 6,
           offset: const Offset(0, 2),
         ),
@@ -243,26 +257,67 @@ abstract final class CHShadows {
 
   static List<BoxShadow> medium(Color color) => [
         BoxShadow(
-          color: color.withValues(alpha: 0.12),
-          blurRadius: 24,
-          offset: const Offset(0, 8),
+          color: color.withValues(alpha: 0.10),
+          blurRadius: 20,
+          offset: const Offset(0, 6),
         ),
         BoxShadow(
-          color: color.withValues(alpha: 0.06),
+          color: color.withValues(alpha: 0.04),
           blurRadius: 8,
-          offset: const Offset(0, 3),
+          offset: const Offset(0, 2),
         ),
       ];
 
   static List<BoxShadow> glow(Color color) => [
         BoxShadow(
-          color: color.withValues(alpha: 0.25),
-          blurRadius: 20,
-          offset: const Offset(0, 6),
+          color: color.withValues(alpha: 0.20),
+          blurRadius: 18,
+          offset: const Offset(0, 4),
         ),
       ];
 
   static const List<BoxShadow> none = [];
+}
+
+/// Reactive Scope Widget for theme state management.
+///
+/// Wraps MaterialApp and allows any screen or dialog in the application
+/// to dynamically and repeatedly toggle themes without stale props.
+class AppThemeScope extends InheritedWidget {
+  const AppThemeScope({
+    super.key,
+    required this.themeMode,
+    required this.onThemeModeChanged,
+    required super.child,
+  });
+
+  final ThemeMode themeMode;
+  final ValueChanged<ThemeMode> onThemeModeChanged;
+
+  /// Retrieves the nearest [AppThemeScope].
+  static AppThemeScope of(BuildContext context) {
+    final scope = context.dependOnInheritedWidgetOfExactType<AppThemeScope>();
+    assert(scope != null, 'No AppThemeScope found in context. Wrap MaterialApp with AppThemeScope.');
+    return scope!;
+  }
+
+  /// Retrieves the nearest [AppThemeScope] if available.
+  static AppThemeScope? maybeOf(BuildContext context) {
+    return context.dependOnInheritedWidgetOfExactType<AppThemeScope>();
+  }
+
+  /// Toggles between light and dark mode reactively based on active brightness.
+  void toggleTheme(BuildContext context) {
+    final currentBrightness = Theme.of(context).brightness;
+    final nextMode = currentBrightness == Brightness.dark
+        ? ThemeMode.light
+        : ThemeMode.dark;
+    onThemeModeChanged(nextMode);
+  }
+
+  @override
+  bool updateShouldNotify(AppThemeScope oldWidget) =>
+      themeMode != oldWidget.themeMode;
 }
 
 /// The main app theme builder.
@@ -270,14 +325,14 @@ abstract final class AppTheme {
   static ThemeData light() {
     final scheme = ColorScheme(
       brightness: Brightness.light,
-      primary: CHColors.electricIndigo,
+      primary: CHColors.charusatBlue,
       onPrimary: Colors.white,
-      primaryContainer: const Color(0xFFEEF2FF),
-      onPrimaryContainer: const Color(0xFF312E81),
-      secondary: CHColors.royalBlue,
+      primaryContainer: CHColors.charusatBlueLight,
+      onPrimaryContainer: const Color(0xFF003866),
+      secondary: CHColors.cdpcOrange,
       onSecondary: Colors.white,
-      secondaryContainer: const Color(0xFFDBEAFE),
-      onSecondaryContainer: const Color(0xFF1E40AF),
+      secondaryContainer: CHColors.cdpcOrangeLight,
+      onSecondaryContainer: const Color(0xFF8A4100),
       tertiary: CHColors.emerald,
       onTertiary: Colors.white,
       tertiaryContainer: const Color(0xFFD1FAE5),
@@ -290,8 +345,8 @@ abstract final class AppTheme {
       onSurface: CHColors.lightTextPrimary,
       onSurfaceVariant: CHColors.lightTextSecondary,
       outline: CHColors.lightBorder,
-      outlineVariant: const Color(0xFFF3F4F6),
-      shadow: const Color(0xFF111827),
+      outlineVariant: const Color(0xFFF1F5F9),
+      shadow: const Color(0xFF0F172A),
     );
     return _build(scheme, CHColors.lightBg);
   }
@@ -299,14 +354,14 @@ abstract final class AppTheme {
   static ThemeData dark() {
     final scheme = ColorScheme(
       brightness: Brightness.dark,
-      primary: const Color(0xFF818CF8),
-      onPrimary: const Color(0xFF1E1B4B),
-      primaryContainer: const Color(0xFF312E81),
-      onPrimaryContainer: const Color(0xFFC7D2FE),
-      secondary: const Color(0xFF60A5FA),
-      onSecondary: const Color(0xFF1E3A5F),
-      secondaryContainer: const Color(0xFF1E3A5F),
-      onSecondaryContainer: const Color(0xFFBFDBFE),
+      primary: const Color(0xFF60A5FA),
+      onPrimary: const Color(0xFF002B4D),
+      primaryContainer: const Color(0xFF004B87),
+      onPrimaryContainer: const Color(0xFFBFDBFE),
+      secondary: const Color(0xFFFBBF24),
+      onSecondary: const Color(0xFF451A03),
+      secondaryContainer: const Color(0xFF78350F),
+      onSecondaryContainer: const Color(0xFFFDE68A),
       tertiary: const Color(0xFF34D399),
       onTertiary: const Color(0xFF064E3B),
       tertiaryContainer: const Color(0xFF064E3B),
@@ -361,8 +416,8 @@ abstract final class AppTheme {
           borderRadius: CHRadius.xlBorder,
           side: BorderSide(
             color: isDark
-                ? CHColors.darkBorder.withValues(alpha: 0.5)
-                : CHColors.lightBorder.withValues(alpha: 0.7),
+                ? CHColors.darkBorder.withValues(alpha: 0.6)
+                : CHColors.lightBorder,
           ),
         ),
       ),
@@ -370,15 +425,15 @@ abstract final class AppTheme {
       // Inputs
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: isDark ? CHColors.darkSurfaceElevated : CHColors.lightSurfaceDim,
+        fillColor: isDark ? CHColors.darkSurfaceElevated : Colors.white,
         contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
         border: OutlineInputBorder(
           borderRadius: CHRadius.lgBorder,
-          borderSide: BorderSide.none,
+          borderSide: BorderSide(color: scheme.outline),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: CHRadius.lgBorder,
-          borderSide: BorderSide.none,
+          borderSide: BorderSide(color: scheme.outline),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: CHRadius.lgBorder,
@@ -406,48 +461,56 @@ abstract final class AppTheme {
       // Buttons
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          minimumSize: const Size.fromHeight(54),
+          backgroundColor: scheme.primary,
+          foregroundColor: scheme.onPrimary,
+          minimumSize: const Size.fromHeight(50),
           shape: RoundedRectangleBorder(
-            borderRadius: CHRadius.lgBorder,
+            borderRadius: BorderRadius.circular(14),
           ),
           textStyle: CHTypography.labelLarge.copyWith(
             fontSize: 15,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.2,
           ),
           elevation: 0,
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          minimumSize: const Size.fromHeight(54),
+          foregroundColor: scheme.primary,
+          minimumSize: const Size.fromHeight(50),
+          side: BorderSide(color: scheme.primary, width: 1.5),
           shape: RoundedRectangleBorder(
-            borderRadius: CHRadius.lgBorder,
+            borderRadius: BorderRadius.circular(14),
           ),
-          side: BorderSide(color: scheme.outline),
           textStyle: CHTypography.labelLarge.copyWith(
             fontSize: 15,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.2,
           ),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          textStyle: CHTypography.labelLarge,
+          foregroundColor: scheme.primary,
+          textStyle: CHTypography.labelLarge.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
 
       // Navigation Bar
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: isDark
-            ? CHColors.darkSurface.withValues(alpha: 0.95)
-            : Colors.white.withValues(alpha: 0.97),
+            ? CHColors.darkSurface.withValues(alpha: 0.98)
+            : Colors.white.withValues(alpha: 0.98),
         indicatorColor: scheme.primary.withValues(alpha: 0.12),
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         height: 68,
         labelTextStyle: WidgetStatePropertyAll(
           CHTypography.labelMedium.copyWith(
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w600,
             color: scheme.onSurface,
           ),
         ),
@@ -465,7 +528,7 @@ abstract final class AppTheme {
           borderRadius: CHRadius.pillBorder,
         ),
         side: BorderSide(
-          color: scheme.outline.withValues(alpha: 0.5),
+          color: scheme.outline.withValues(alpha: 0.7),
         ),
         backgroundColor: isDark ? CHColors.darkSurfaceElevated : CHColors.lightSurfaceDim,
         selectedColor: scheme.primaryContainer,
@@ -475,7 +538,7 @@ abstract final class AppTheme {
 
       // Divider
       dividerTheme: DividerThemeData(
-        color: scheme.outline.withValues(alpha: 0.4),
+        color: scheme.outline.withValues(alpha: 0.5),
         thickness: 1,
         space: 1,
       ),
