@@ -70,6 +70,7 @@ public class UserAccount {
     public Instant getCreatedAt() { return createdAt; }
 
     public void updateFullName(String fullName) { this.fullName = fullName; }
+    public void changePasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
     public void setRole(Role role) { this.role = role; }
     public void setDepartment(Department department) { this.department = department; }
     public void setStudent(Student student) { this.student = student; }

@@ -1,6 +1,7 @@
 import 'dart:convert';
-import 'dart:typed_data';
+import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
@@ -8,6 +9,8 @@ import '../models/student_profile.dart';
 import '../models/placement_models.dart';
 import '../models/placement_attachment.dart';
 import '../models/announcement.dart';
+import '../models/student_directory.dart';
+import '../models/registration_verification.dart';
 
 class ApiException implements Exception {
   const ApiException(this.message, this.statusCode);
@@ -20,7 +23,18 @@ class ApiException implements Exception {
 }
 
 class PlacementApi {
-  PlacementApi({this.baseUrl = 'http://localhost:8080/api'});
+  PlacementApi({String? baseUrl}) : baseUrl = baseUrl ?? _defaultBaseUrl;
+
+  static String get _defaultBaseUrl {
+    const configured = String.fromEnvironment('API_BASE_URL');
+    if (configured.isNotEmpty) return configured;
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+      return 'http://localhost:8080/api';
+    }
+    // Android emulators expose the host machine through 10.0.2.2.
+    // Physical devices should use --dart-define=API_BASE_URL=... or adb reverse.
+    return 'http://10.0.2.2:8080/api';
+  }
 
   final String baseUrl;
   String? _token;
@@ -52,6 +66,43 @@ class PlacementApi {
     });
   }
 
+  Future<RegistrationVerification> beginRegistration({
+    required String fullName,
+    required String enrollmentNumber,
+    required String universityEmail,
+    required String password,
+    required String confirmPassword,
+  }) async {
+    final response = await _post('/auth/register', {
+      'fullName': fullName,
+      'enrollmentNumber': enrollmentNumber,
+      'universityEmail': universityEmail,
+      'password': password,
+      'confirmPassword': confirmPassword,
+    });
+    return RegistrationVerification.fromJson(response);
+  }
+
+  Future<void> verifyRegistrationOtp({
+    required int registrationId,
+    required String otp,
+  }) async {
+    await _requestJson(
+      'POST',
+      '/auth/register/verify',
+      body: {'registrationId': registrationId, 'otp': otp},
+    );
+  }
+
+  Future<RegistrationVerification> resendRegistrationOtp(
+    int registrationId,
+  ) async {
+    final response = await _post('/auth/register/resend', {
+      'registrationId': registrationId,
+    });
+    return RegistrationVerification.fromJson(response);
+  }
+
   Future<StudentProfile> fetchMe() async {
     final response = await _request('GET', '/me');
     return StudentProfile.fromJson(response);
@@ -59,9 +110,61 @@ class PlacementApi {
 
   Future<List<Announcement>> fetchAnnouncements() async {
     final response = await _requestJson('GET', '/announcements');
-    if (response is! List) throw const ApiException('Invalid announcements response', 200);
-    return response.map((item) => Announcement.fromJson(Map<String, dynamic>.from(item as Map))).toList(growable: false);
+    if (response is! List) {
+      throw const ApiException('Invalid announcements response', 200);
+    }
+    return response
+        .map(
+          (item) =>
+              Announcement.fromJson(Map<String, dynamic>.from(item as Map)),
+        )
+        .toList(growable: false);
   }
+
+  Future<List<StudentDirectoryEntry>> fetchStudentDirectory({
+    String search = '',
+  }) async {
+    final path = search.trim().isEmpty
+        ? '/student/directory'
+        : '/student/directory?search=${Uri.encodeQueryComponent(search.trim())}';
+    final response = await _requestJson('GET', path);
+    if (response is! List) {
+      throw const ApiException('Invalid student directory response', 200);
+    }
+    return response
+        .map(
+          (item) => StudentDirectoryEntry.fromJson(
+            Map<String, dynamic>.from(item as Map),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  Future<void> submitComplaint({
+    required String subject,
+    required String message,
+  }) async {
+    await _requestJson(
+      'POST',
+      '/student/support/complaints',
+      body: {'subject': subject, 'message': message},
+    );
+  }
+
+  Future<void> requestPasswordOtp() async =>
+      _requestJson('POST', '/student/password/otp');
+
+  Future<void> verifyPasswordOtp(String otp) async =>
+      _requestJson('POST', '/student/password/verify-otp', body: {'otp': otp});
+
+  Future<void> changePassword(
+    String newPassword,
+    String confirmPassword,
+  ) async => _requestJson(
+    'PUT',
+    '/student/password',
+    body: {'newPassword': newPassword, 'confirmPassword': confirmPassword},
+  );
 
   Future<StudentProfile> updateMe(Map<String, dynamic> update) async {
     final response = await _request('PUT', '/me', body: update);
@@ -142,9 +245,20 @@ class PlacementApi {
   }
 
   Future<List<PlacementAttachment>> fetchDriveAttachments(int driveId) async {
-    final response = await _requestJson('GET', '/placement/drives/$driveId/attachments');
-    if (response is! List) throw const ApiException('Invalid attachments response', 200);
-    return response.map((item) => PlacementAttachment.fromJson(Map<String, dynamic>.from(item as Map))).toList(growable: false);
+    final response = await _requestJson(
+      'GET',
+      '/placement/drives/$driveId/attachments',
+    );
+    if (response is! List) {
+      throw const ApiException('Invalid attachments response', 200);
+    }
+    return response
+        .map(
+          (item) => PlacementAttachment.fromJson(
+            Map<String, dynamic>.from(item as Map),
+          ),
+        )
+        .toList(growable: false);
   }
 
   Future<PlacementApplication> applyToDrive(int driveId) async {
@@ -209,7 +323,10 @@ class PlacementApi {
         .toList(growable: false);
   }
 
-  Future<PlacementApplication> decideOffer(int applicationId, String decision) async {
+  Future<PlacementApplication> decideOffer(
+    int applicationId,
+    String decision,
+  ) async {
     final response = await _requestJson(
       'PUT',
       '/placement/student/applications/$applicationId/offer',
@@ -250,13 +367,38 @@ class PlacementApi {
       ..headers.addAll(headers);
     if (body != null) request.body = jsonEncode(body);
 
-    final response = await http.Client().send(request);
-    final text = await response.stream.bytesToString();
-    final decoded = text.isEmpty ? <String, dynamic>{} : jsonDecode(text);
+    final client = http.Client();
+    late http.Response response;
+    try {
+      final streamed = await client
+          .send(request)
+          .timeout(const Duration(seconds: 15));
+      response = await http.Response.fromStream(streamed);
+    } on TimeoutException {
+      throw const ApiException('The server took too long to respond.', 0);
+    } on http.ClientException {
+      throw const ApiException(
+        'Cannot reach the server. Check that the backend is running and the app is using the correct host.',
+        0,
+      );
+    } finally {
+      client.close();
+    }
+    final text = response.body;
+    dynamic decoded;
+    try {
+      decoded = text.isEmpty ? <String, dynamic>{} : jsonDecode(text);
+    } on FormatException {
+      decoded = <String, dynamic>{};
+    }
     if (response.statusCode < 200 || response.statusCode >= 300) {
       final data = decoded is Map ? Map<String, dynamic>.from(decoded) : {};
       throw ApiException(
-        (data['detail'] ?? data['message'] ?? _fallbackMessage(response.statusCode)).toString(),
+        (data['detail'] ??
+                data['message'] ??
+                data['error'] ??
+                _fallbackMessage(response.statusCode))
+            .toString(),
         response.statusCode,
       );
     }
@@ -276,7 +418,9 @@ class PlacementApi {
       case 400:
         return 'Please check the information and try again.';
       default:
-        return statusCode >= 500 ? 'The server is temporarily unavailable.' : 'Request could not be completed.';
+        return statusCode >= 500
+            ? 'The server is temporarily unavailable.'
+            : 'Request could not be completed.';
     }
   }
 }

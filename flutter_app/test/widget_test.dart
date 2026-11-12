@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:placement_management_app/main.dart';
 import 'package:placement_management_app/models/announcement.dart';
+import 'package:placement_management_app/models/student_directory.dart';
 import 'package:placement_management_app/models/placement_models.dart';
 import 'package:placement_management_app/screens/student_home.dart';
 import 'package:placement_management_app/services/placement_api.dart';
@@ -48,6 +49,10 @@ testWidgets('student shell switches between the four local destinations', (
     await tester.tap(find.text('Announcements'));
     await tester.pumpAndSettle();
     expect(find.text('No announcements yet'), findsOneWidget);
+
+    await tester.tap(find.text('More'));
+    await tester.pumpAndSettle();
+    expect(find.text('Change Password'), findsOneWidget);
   });
 
   testWidgets('theme toggle switches repeatedly between dark and light mode', (
@@ -97,4 +102,7 @@ class _FakePlacementApi extends PlacementApi {
 
   @override
   Future<List<Announcement>> fetchAnnouncements() async => const [];
+
+  @override
+  Future<List<StudentDirectoryEntry>> fetchStudentDirectory({String search = ''}) async => const [];
 }
