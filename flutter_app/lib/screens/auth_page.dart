@@ -5,6 +5,7 @@ import '../services/placement_api.dart';
 import '../theme/app_theme.dart';
 import 'student_home.dart';
 import 'welcome_screen.dart';
+import 'registration_otp_page.dart';
 
 class AuthPage extends StatefulWidget {
   const AuthPage({
@@ -60,16 +61,42 @@ class _AuthPageState extends State<AuthPage> {
       _message = null;
     });
     try {
-      final data = _registering
-          ? await widget.api.register(
-              fullName: _name.text.trim(),
-              enrollmentNumber: _enrollment.text.trim(),
-              universityEmail: _email.text.trim(),
-              password: _password.text,
-              confirmPassword: _confirmPassword.text,
-            )
-          : await widget.api.login(_enrollment.text.trim(), _password.text);
-      if (!_registering && data['token'] is String) {
+      if (_registering) {
+        final verification = await widget.api.beginRegistration(
+          fullName: _name.text.trim(),
+          enrollmentNumber: _enrollment.text.trim(),
+          universityEmail: _email.text.trim(),
+          password: _password.text,
+          confirmPassword: _confirmPassword.text,
+        );
+        if (!mounted) return;
+        final completed = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (_) => RegistrationOtpPage(
+              api: widget.api,
+              verification: verification,
+            ),
+          ),
+        );
+        if (completed == true && mounted) {
+          _name.clear();
+          _enrollment.clear();
+          _email.clear();
+          _password.clear();
+          _confirmPassword.clear();
+          setState(() {
+            _registering = false;
+            _message = 'Registration verified. You can now sign in.';
+          });
+        }
+      } else {
+        final data = await widget.api.login(
+          _enrollment.text.trim(),
+          _password.text,
+        );
+        if (data['token'] is! String) {
+          throw const ApiException('Invalid login response', 200);
+        }
         widget.api.setToken(data['token'] as String);
         if (!mounted) return;
         await Navigator.of(context).pushReplacement(
@@ -82,14 +109,12 @@ class _AuthPageState extends State<AuthPage> {
             ),
           ),
         );
-      } else if (mounted) {
-        setState(() => _message = 'Account created. You can now sign in.');
       }
     } on ApiException catch (error) {
       if (mounted) setState(() => _message = error.message);
     } catch (_) {
       if (mounted) {
-        setState(() => _message = 'Could not connect to the backend.');
+        setState(() => _message = 'The server returned an invalid response.');
       }
     } finally {
       if (mounted) setState(() => _loading = false);

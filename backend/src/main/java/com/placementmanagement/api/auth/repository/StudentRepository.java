@@ -14,6 +14,26 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
     long countByDepartment_Id(Long departmentId);
     List<Student> findAllByDepartment_IdOrderByUser_FullNameAsc(Long departmentId);
 
+    interface DirectoryProjection {
+        Long getStudentId();
+        String getFullName();
+        String getEnrollmentNumber();
+        String getAcademicProgram();
+        String getDepartmentName();
+    }
+
+    @Query("""
+        select s.id as studentId, u.fullName as fullName, s.enrollmentNumber as enrollmentNumber,
+               s.academicProgram as academicProgram, d.name as departmentName
+        from Student s join s.user u join s.department d
+        where cast(:search as String) is null
+           or lower(u.fullName) like lower(concat('%', cast(:search as String), '%'))
+           or lower(s.enrollmentNumber) like lower(concat('%', cast(:search as String), '%'))
+           or lower(coalesce(s.academicProgram, '')) like lower(concat('%', cast(:search as String), '%'))
+        order by u.fullName
+        """)
+    List<DirectoryProjection> findStudentDirectory(@Param("search") String search);
+
     @Query("""
         select s.id as studentId, u.fullName as fullName, u.universityEmail as universityEmail,
                s.enrollmentNumber as enrollmentNumber, d.id as departmentId, d.code as departmentCode,

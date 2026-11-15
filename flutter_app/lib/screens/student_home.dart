@@ -8,6 +8,7 @@ import '../services/placement_api.dart';
 import 'profile_page.dart';
 import 'settings_page.dart';
 import 'announcements_page.dart';
+import 'more_page.dart';
 
 class StudentHomeShell extends StatefulWidget {
   const StudentHomeShell({
@@ -94,6 +95,7 @@ class _StudentHomeShellState extends State<StudentHomeShell>
         api: widget.api,
         onSessionExpired: widget.onLogout,
       ),
+      MorePage(api: widget.api, onLogout: widget.onLogout),
     ];
 
     return Scaffold(
@@ -145,6 +147,11 @@ class _StudentHomeShellState extends State<StudentHomeShell>
             icon: Icon(Icons.campaign_outlined),
             selectedIcon: Icon(Icons.campaign_rounded),
             label: 'Announcements',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.more_horiz_rounded),
+            selectedIcon: Icon(Icons.more_rounded),
+            label: 'More',
           ),
         ],
       ),
