@@ -4,7 +4,7 @@ import { Router } from '@angular/router';
 import { BehaviorSubject, Observable, tap } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
-import { AuthResponse, MeResponse, StaffLoginRequest, StaffRole } from '../models/auth.models';
+import { AuthResponse, ForgotPasswordResponse, MeResponse, StaffLoginRequest, StaffRole, VerifyForgotPasswordResponse } from '../models/auth.models';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -38,6 +38,20 @@ export class AuthService {
         sessionStorage.setItem(this.tokenKey, JSON.stringify(response));
       })
     );
+  }
+
+  requestForgotPassword(email: string): Observable<ForgotPasswordResponse> {
+    return this.http.post<ForgotPasswordResponse>(`${this.apiUrl}/api/auth/forgot-password`, { email });
+  }
+
+  verifyForgotPassword(email: string, otp: string): Observable<VerifyForgotPasswordResponse> {
+    return this.http.post<VerifyForgotPasswordResponse>(`${this.apiUrl}/api/auth/forgot-password/verify-otp`, { email, otp });
+  }
+
+  resetForgotPassword(recoveryToken: string, newPassword: string, confirmPassword: string): Observable<void> {
+    return this.http.post<void>(`${this.apiUrl}/api/auth/forgot-password/reset`, {
+      recoveryToken, newPassword, confirmPassword
+    });
   }
 
   /** Fetch current user profile from /api/me. */

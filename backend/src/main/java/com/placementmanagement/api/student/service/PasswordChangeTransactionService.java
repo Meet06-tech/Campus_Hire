@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.placementmanagement.api.auth.entity.UserAccount;
 import com.placementmanagement.api.auth.repository.UserAccountRepository;
 import com.placementmanagement.api.student.entity.PasswordChangeOtp;
+import com.placementmanagement.api.student.entity.PasswordOtpPurpose;
 import com.placementmanagement.api.student.repository.PasswordChangeOtpRepository;
 
 /** Atomically consumes one verified OTP and updates the same authenticated user's password. */
@@ -28,8 +29,20 @@ public class PasswordChangeTransactionService {
     public Result change(Long userId, String passwordHash) {
         UserAccount user = users.findByIdForUpdate(userId).orElse(null);
         if (user == null) return Result.NOT_FOUND;
-
         PasswordChangeOtp challenge = otps.findActiveForUpdate(userId).stream().findFirst().orElse(null);
+        return update(user, challenge, passwordHash);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public Result change(Long userId, String passwordHash, PasswordOtpPurpose purpose) {
+        UserAccount user = users.findByIdForUpdate(userId).orElse(null);
+        if (user == null) return Result.NOT_FOUND;
+
+        PasswordChangeOtp challenge = otps.findActiveForUpdate(userId, purpose).stream().findFirst().orElse(null);
+        return update(user, challenge, passwordHash);
+    }
+
+    private Result update(UserAccount user, PasswordChangeOtp challenge, String passwordHash) {
         if (challenge == null) return Result.NOT_FOUND;
         if (challenge.getExpiresAt().isBefore(Instant.now())) {
             challenge.markUsed();

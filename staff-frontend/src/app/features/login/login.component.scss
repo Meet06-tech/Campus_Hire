@@ -124,3 +124,13 @@
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+.link-button {
+  border: 0;
+  background: transparent;
+  color: #1769aa;
+  cursor: pointer;
+  padding: 10px;
+}
+
+.success-banner { color: #176b3a; background: #eaf7ef; padding: 12px; border-radius: 8px; margin-bottom: 16px; }
+.form-help { color: #64748b; line-height: 1.5; }

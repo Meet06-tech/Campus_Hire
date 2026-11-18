@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.placementmanagement.api.auth.entity.UserAccount;
 import com.placementmanagement.api.auth.repository.UserAccountRepository;
 import com.placementmanagement.api.student.entity.PasswordChangeOtp;
+import com.placementmanagement.api.student.entity.PasswordOtpPurpose;
 import com.placementmanagement.api.student.repository.PasswordChangeOtpRepository;
 
 /** Serializes OTP issuance per user using a database row lock. */
@@ -25,6 +26,11 @@ public class PasswordOtpIssuanceService {
 
     @Transactional
     public Optional<PasswordChangeOtp> issue(Long userId, String otpHash, Instant now) {
+        return issue(userId, otpHash, now, PasswordOtpPurpose.PASSWORD_CHANGE);
+    }
+
+    @Transactional
+    public Optional<PasswordChangeOtp> issue(Long userId, String otpHash, Instant now, PasswordOtpPurpose purpose) {
         UserAccount user = users.findByIdForUpdate(userId).orElseThrow();
         if (otps.findTopByUser_IdOrderByRequestedAtDesc(userId)
                 .filter(latest -> latest.getRequestedAt().plus(60, ChronoUnit.SECONDS).isAfter(now))
@@ -32,6 +38,6 @@ public class PasswordOtpIssuanceService {
             return Optional.empty();
         }
         otps.findAllByUser_IdAndUsedAtIsNull(userId).forEach(PasswordChangeOtp::markUsed);
-        return Optional.of(otps.save(new PasswordChangeOtp(user, otpHash, now.plus(5, ChronoUnit.MINUTES))));
+        return Optional.of(otps.save(new PasswordChangeOtp(user, otpHash, now.plus(5, ChronoUnit.MINUTES), purpose)));
     }
 }
