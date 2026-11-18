@@ -6,6 +6,7 @@ import '../theme/app_theme.dart';
 import 'student_home.dart';
 import 'welcome_screen.dart';
 import 'registration_otp_page.dart';
+import 'forgot_password_page.dart';
 
 class AuthPage extends StatefulWidget {
   const AuthPage({
@@ -413,6 +414,20 @@ class _AuthPageState extends State<AuthPage> {
                               : 'New student? Create an account',
                         ),
                       ),
+
+                      if (!_registering)
+                        TextButton.icon(
+                          onPressed: _loading
+                              ? null
+                              : () => Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        ForgotPasswordPage(api: widget.api),
+                                  ),
+                                ),
+                          icon: const Icon(Icons.lock_reset_rounded, size: 18),
+                          label: const Text('Forgot Password?'),
+                        ),
 
                       if (_message != null) ...[
                         const SizedBox(height: 14),

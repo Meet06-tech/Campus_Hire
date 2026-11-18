@@ -2,16 +2,18 @@
   <div class="login-card">
     <div class="login-header">
       <h1>CampusHire</h1>
-      <p>Staff Portal</p>
+      <p>{{ mode === 'login' ? 'Staff Portal' : 'Password recovery' }}</p>
     </div>
 
-    <form (ngSubmit)="onSubmit()" class="login-form">
-      @if (errorMessage()) {
-        <div class="error-banner">
-          {{ errorMessage() }}
-        </div>
-      }
+    @if (recoveryMessage()) {
+      <div class="success-banner">{{ recoveryMessage() }}</div>
+    }
+    @if (errorMessage()) {
+      <div class="error-banner">{{ errorMessage() }}</div>
+    }
 
+    @if (mode === 'login') {
+    <form (ngSubmit)="onSubmit()" class="login-form">
       <div class="form-group">
         <label for="identifier">Email</label>
         <input
@@ -47,6 +49,27 @@
           Sign In
         }
       </button>
+      <button type="button" class="link-button" (click)="mode = 'request'; errorMessage.set(null); recoveryMessage.set(null)">Forgot Password?</button>
     </form>
+    } @else if (mode === 'request') {
+      <form (ngSubmit)="requestRecovery()" class="login-form">
+        <p class="form-help">Enter your registered email. If an account exists, we will send a verification code.</p>
+        <div class="form-group"><label for="recoveryEmail">Registered email</label><input id="recoveryEmail" type="email" [(ngModel)]="recoveryEmail" name="recoveryEmail" autocomplete="email" [disabled]="loading()" required /></div>
+        <button type="submit" class="login-button" [disabled]="loading()">{{ loading() ? 'Sending…' : 'Send verification code' }}</button>
+        <button type="button" class="link-button" (click)="backToLogin()">Back to login</button>
+      </form>
+    } @else if (mode === 'verify') {
+      <form (ngSubmit)="verifyRecovery()" class="login-form">
+        <div class="form-group"><label for="otp">Verification code</label><input id="otp" inputmode="numeric" maxlength="6" [(ngModel)]="otp" name="otp" [disabled]="loading()" required /></div>
+        <button type="submit" class="login-button" [disabled]="loading()">{{ loading() ? 'Verifying…' : 'Verify code' }}</button>
+        <button type="button" class="link-button" (click)="mode = 'request'; errorMessage.set(null)">Send another code</button>
+      </form>
+    } @else {
+      <form (ngSubmit)="resetRecovery()" class="login-form">
+        <div class="form-group"><label for="newPassword">New password</label><input id="newPassword" type="password" [(ngModel)]="newPassword" name="newPassword" autocomplete="new-password" [disabled]="loading()" required /></div>
+        <div class="form-group"><label for="confirmPassword">Confirm password</label><input id="confirmPassword" type="password" [(ngModel)]="confirmPassword" name="confirmPassword" autocomplete="new-password" [disabled]="loading()" required /></div>
+        <button type="submit" class="login-button" [disabled]="loading()">{{ loading() ? 'Updating…' : 'Set new password' }}</button>
+      </form>
+    }
   </div>
 </div>

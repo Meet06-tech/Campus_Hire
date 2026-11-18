@@ -52,3 +52,12 @@ export interface StaffLoginRequest {
   identifier: string;
   password: string;
 }
+
+export interface ForgotPasswordResponse {
+  message: string;
+}
+
+export interface VerifyForgotPasswordResponse {
+  recoveryToken: string;
+  expiresInSeconds: number;
+}

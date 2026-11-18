@@ -50,6 +50,36 @@ class PlacementApi {
     });
   }
 
+  Future<Map<String, dynamic>> requestForgotPassword(String email) {
+    return _post('/auth/forgot-password', {'email': email});
+  }
+
+  Future<Map<String, dynamic>> verifyForgotPassword({
+    required String email,
+    required String otp,
+  }) {
+    return _post('/auth/forgot-password/verify-otp', {
+      'email': email,
+      'otp': otp,
+    });
+  }
+
+  Future<void> resetForgotPassword({
+    required String recoveryToken,
+    required String newPassword,
+    required String confirmPassword,
+  }) async {
+    await _requestJson(
+      'POST',
+      '/auth/forgot-password/reset',
+      body: {
+        'recoveryToken': recoveryToken,
+        'newPassword': newPassword,
+        'confirmPassword': confirmPassword,
+      },
+    );
+  }
+
   Future<Map<String, dynamic>> register({
     required String fullName,
     required String enrollmentNumber,

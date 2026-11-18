@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.placementmanagement.api.student.entity.PasswordChangeOtp;
+import com.placementmanagement.api.student.entity.PasswordOtpPurpose;
 import com.placementmanagement.api.student.repository.PasswordChangeOtpRepository;
 
 /** Performs OTP state transitions while holding a row lock. It never throws for a failed attempt. */
@@ -27,6 +28,16 @@ public class PasswordOtpAttemptService {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Result verify(Long userId, String suppliedOtp) {
         PasswordChangeOtp challenge = otps.findActiveForUpdate(userId).stream().findFirst().orElse(null);
+        return evaluate(challenge, suppliedOtp);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public Result verify(Long userId, String suppliedOtp, PasswordOtpPurpose purpose) {
+        PasswordChangeOtp challenge = otps.findActiveForUpdate(userId, purpose).stream().findFirst().orElse(null);
+        return evaluate(challenge, suppliedOtp);
+    }
+
+    private Result evaluate(PasswordChangeOtp challenge, String suppliedOtp) {
         if (challenge == null) return Result.NOT_FOUND;
         if (challenge.getExpiresAt().isBefore(Instant.now())) {
             challenge.markUsed();
