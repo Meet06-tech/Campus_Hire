@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:placement_management_app/main.dart';
@@ -66,6 +67,31 @@ void main() {
     expect(find.text('Change Password'), findsOneWidget);
   });
 
+  testWidgets('new student session loads its own photo after the previous shell is removed', (
+    WidgetTester tester,
+  ) async {
+    final firstPhoto = (await rootBundle.load('assets/images/charusat_logo.png'))
+        .buffer.asUint8List();
+    final secondPhoto = (await rootBundle.load('assets/images/cdpc_logo_square.png'))
+        .buffer.asUint8List();
+
+    Future<void> showPhoto(Uint8List bytes) async {
+      await tester.pumpWidget(MaterialApp(
+        home: StudentHomeShell(api: _FakePlacementApi(photo: bytes), onLogout: () {}),
+      ));
+      await tester.pumpAndSettle();
+      final avatar = tester.widget<CircleAvatar>(find.byWidgetPredicate(
+        (widget) => widget is CircleAvatar && widget.backgroundImage is MemoryImage,
+      ).first);
+      expect((avatar.backgroundImage! as MemoryImage).bytes, orderedEquals(bytes));
+    }
+
+    await showPhoto(firstPhoto);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    await showPhoto(secondPhoto);
+  });
+
   testWidgets('theme toggle switches repeatedly between dark and light mode', (
     WidgetTester tester,
   ) async {
@@ -94,7 +120,9 @@ void main() {
 }
 
 class _FakePlacementApi extends PlacementApi {
-  _FakePlacementApi() : super(baseUrl: 'http://test');
+  _FakePlacementApi({this.photo}) : super(baseUrl: 'http://test');
+
+  final Uint8List? photo;
 
   @override
   Future<List<PlacementDrive>> fetchStudentDrives() async => const [];
@@ -111,7 +139,7 @@ class _FakePlacementApi extends PlacementApi {
       const [];
 
   @override
-  Future<Uint8List?> fetchProfilePhoto() async => null;
+  Future<Uint8List?> fetchProfilePhoto() async => photo;
 
   @override
   Future<List<Announcement>> fetchAnnouncements() async => const [];

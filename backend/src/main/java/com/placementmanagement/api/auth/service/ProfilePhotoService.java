@@ -35,7 +35,7 @@ public class ProfilePhotoService {
         try {
             student.updateProfilePhotoKey(newKey);
             students.save(student);
-            cleanupAfterCommit(newKey, oldKey);
+            cleanupAfterCommit(newKey, oldKey, student.getId());
             return Map.of("photoUrl", "/api/me/profile-photo");
         } catch (RuntimeException exception) {
             storage.deleteQuietly(newKey);
@@ -48,6 +48,7 @@ public class ProfilePhotoService {
     public void remove(org.springframework.security.core.Authentication authentication) {
         Student student = currentUserService.authenticatedStudent(authentication);
         String oldKey = student.getProfilePhotoKey();
+        Long studentId = student.getId();
         if (oldKey == null) return;
         try {
             student.updateProfilePhotoKey(null);
@@ -55,7 +56,7 @@ public class ProfilePhotoService {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    storage.deleteQuietly(oldKey);
+                    deleteIfUnreferenced(oldKey, studentId);
                 }
             });
         } catch (RuntimeException exception) {
@@ -64,11 +65,11 @@ public class ProfilePhotoService {
         }
     }
 
-    private void cleanupAfterCommit(String newKey, String oldKey) {
+    private void cleanupAfterCommit(String newKey, String oldKey, Long studentId) {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                storage.deleteQuietly(oldKey);
+                deleteIfUnreferenced(oldKey, studentId);
             }
 
             @Override
@@ -78,9 +79,27 @@ public class ProfilePhotoService {
         });
     }
 
+    private void deleteIfUnreferenced(String key, Long excludingStudentId) {
+        if (key != null && !students.existsByProfilePhotoKeyAndIdNot(key, excludingStudentId)) {
+            storage.deleteQuietly(key);
+        }
+    }
+
     @Transactional(readOnly = true)
     public PhotoFile current(org.springframework.security.core.Authentication authentication) {
         Student student = currentUserService.authenticatedStudent(authentication);
+        if (student.getProfilePhotoKey() == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Profile photo not found");
+        }
+        String key = student.getProfilePhotoKey();
+        return new PhotoFile(storage.read(key), storage.contentType(key));
+    }
+
+    @Transactional(readOnly = true)
+    public PhotoFile directoryPhoto(org.springframework.security.core.Authentication authentication, Long studentId) {
+        currentUserService.authenticatedStudent(authentication);
+        Student student = students.findById(studentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Student not found"));
         if (student.getProfilePhotoKey() == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Profile photo not found");
         }

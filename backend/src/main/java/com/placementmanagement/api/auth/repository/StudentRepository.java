@@ -11,6 +11,7 @@ import com.placementmanagement.api.auth.entity.Student;
 import com.placementmanagement.api.placement.dto.PlacementDtos.StaffStudentProjection;
 
 public interface StudentRepository extends JpaRepository<Student, Long> {
+    boolean existsByProfilePhotoKeyAndIdNot(String profilePhotoKey, Long studentId);
     long countByDepartment_Id(Long departmentId);
     List<Student> findAllByDepartment_IdOrderByUser_FullNameAsc(Long departmentId);
 
@@ -20,11 +21,13 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
         String getEnrollmentNumber();
         String getAcademicProgram();
         String getDepartmentName();
+        String getProfilePhotoKey();
     }
 
     @Query("""
         select s.id as studentId, u.fullName as fullName, s.enrollmentNumber as enrollmentNumber,
-               s.academicProgram as academicProgram, d.name as departmentName
+               s.academicProgram as academicProgram, d.name as departmentName,
+               s.profilePhotoKey as profilePhotoKey
         from Student s join s.user u join s.department d
         where cast(:search as String) is null
            or lower(u.fullName) like lower(concat('%', cast(:search as String), '%'))

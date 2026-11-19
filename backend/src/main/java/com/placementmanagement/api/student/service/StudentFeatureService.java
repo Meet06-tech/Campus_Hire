@@ -56,7 +56,9 @@ public class StudentFeatureService {
         String normalized = search == null || search.isBlank() ? null : search.trim();
         return students.findStudentDirectory(normalized).stream()
                 .map(s -> new DirectoryStudentResponse(s.getStudentId(), s.getFullName(), s.getEnrollmentNumber(),
-                        s.getAcademicProgram(), s.getDepartmentName())).toList();
+                        s.getAcademicProgram(), s.getDepartmentName(),
+                        s.getProfilePhotoKey() == null ? null
+                                : "/student/directory/" + s.getStudentId() + "/profile-photo")).toList();
     }
 
     @Transactional

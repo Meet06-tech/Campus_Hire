@@ -170,6 +170,24 @@ class PlacementApi {
         .toList(growable: false);
   }
 
+  Future<Uint8List?> fetchDirectoryPhoto(StudentDirectoryEntry student) async {
+    if (student.profilePhotoUrl == null) return null;
+    final headers = <String, String>{
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache',
+    };
+    if (_token != null) headers['Authorization'] = 'Bearer $_token';
+    final response = await http.get(
+      Uri.parse('$baseUrl${student.profilePhotoUrl!}'),
+      headers: headers,
+    );
+    if (response.statusCode == 404) return null;
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw ApiException('Could not load profile photo', response.statusCode);
+    }
+    return response.bodyBytes;
+  }
+
   Future<void> submitComplaint({
     required String subject,
     required String message,
