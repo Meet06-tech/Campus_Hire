@@ -4,7 +4,7 @@ public final class StudentFeatureDtos {
     private StudentFeatureDtos() {}
 
     public record DirectoryStudentResponse(Long studentId, String fullName, String enrollmentNumber,
-            String academicProgram, String departmentName) {}
+            String academicProgram, String departmentName, String profilePhotoUrl) {}
 
     public record ComplaintRequest(String subject, String message) {}
 

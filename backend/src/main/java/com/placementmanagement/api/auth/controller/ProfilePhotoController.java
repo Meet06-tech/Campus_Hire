@@ -36,7 +36,7 @@ public class  ProfilePhotoController {
     public ResponseEntity<byte[]> read(Authentication authentication) {
         PhotoFile photo = profilePhotoService.current(authentication);
         return ResponseEntity.ok()
-                .header(HttpHeaders.CACHE_CONTROL, "private, max-age=300")
+                .header(HttpHeaders.CACHE_CONTROL, "no-store")
                 .contentType(MediaType.parseMediaType(photo.contentType()))
                 .body(photo.content());
     }
