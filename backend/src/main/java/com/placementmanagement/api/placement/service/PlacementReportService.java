@@ -26,8 +26,15 @@ import com.placementmanagement.api.auth.repository.StudentRepository;
 import com.placementmanagement.api.placement.entity.ApplicationStatus;
 import com.placementmanagement.api.placement.entity.PlacementApplication;
 import com.placementmanagement.api.placement.entity.PlacementDrive;
+import com.placementmanagement.api.placement.entity.RecruitmentRound;
+import com.placementmanagement.api.placement.entity.RoundResult;
+import com.placementmanagement.api.placement.entity.RoundResultStatus;
 import com.placementmanagement.api.placement.repository.PlacementApplicationRepository;
 import com.placementmanagement.api.placement.repository.PlacementDriveRepository;
+import com.placementmanagement.api.placement.repository.AcademicYearRepository;
+import com.placementmanagement.api.placement.repository.RecruitmentRoundRepository;
+import com.placementmanagement.api.placement.repository.RoundResultRepository;
+import com.placementmanagement.api.placement.entity.AcademicYear;
 import com.placementmanagement.api.placement.repository.PlacementApplicationRepository.CompanyHiringProjection;
 
 @Service
@@ -37,32 +44,52 @@ public class PlacementReportService {
     private final PlacementApplicationRepository applications;
     private final PlacementDriveRepository drives;
     private final StudentRepository students;
+    private final AcademicYearRepository academicYears;
+    private final RecruitmentRoundRepository rounds;
+    private final RoundResultRepository roundResults;
 
     public PlacementReportService(PlacementAuthorizationService authorization,
-            PlacementApplicationRepository applications, PlacementDriveRepository drives, StudentRepository students) {
+            PlacementApplicationRepository applications, PlacementDriveRepository drives, StudentRepository students,
+            AcademicYearRepository academicYears, RecruitmentRoundRepository rounds, RoundResultRepository roundResults) {
         this.authorization = authorization;
         this.applications = applications;
         this.drives = drives;
         this.students = students;
+        this.academicYears = academicYears;
+        this.rounds = rounds;
+        this.roundResults = roundResults;
+    }
+
+    public List<AcademicYear> years(Authentication auth) {
+        authorization.staff(auth);
+        return academicYears.findAllByOrderByLabelDesc();
     }
 
     public byte[] placed(Authentication auth, Long departmentId, boolean excel) {
+        return placed(auth, departmentId, null, excel);
+    }
+
+    public byte[] placed(Authentication auth, Long departmentId, Long academicYearId, boolean excel) {
         UserAccount user = authorization.staff(auth);
         departmentId = scopedDepartment(user, departmentId);
         List<List<String>> rows = new ArrayList<>();
         rows.add(List.of("Student name", "Enrollment number", "Email", "Department", "Program", "Semester",
                 "Company", "Drive", "Status", "CTC", "Applied at", "Placement date"));
         placedApplications(departmentId).stream()
-                .filter(a -> inScope(user, a.getDrive())).forEach(a -> rows.add(placedRow(a)));
+                .filter(a -> inScope(user, a.getDrive()) && inYear(a.getDrive(), academicYearId)).forEach(a -> rows.add(placedRow(a)));
         return render(rows, excel);
     }
 
     public byte[] visitedCompanies(Authentication auth, Long departmentId, boolean excel) {
+        return visitedCompanies(auth, departmentId, null, excel);
+    }
+
+    public byte[] visitedCompanies(Authentication auth, Long departmentId, Long academicYearId, boolean excel) {
         UserAccount user = authorization.staff(auth);
         departmentId = scopedDepartment(user, departmentId);
         List<List<String>> rows = new ArrayList<>();
         rows.add(List.of("Company", "Website", "Contact email", "Drive", "Drive status", "Deadline", "Employment type", "CTC", "Stipend"));
-        visitedDrives(user, departmentId).forEach(d -> rows.add(List.of(
+        visitedDrives(user, departmentId).stream().filter(d -> inYear(d, academicYearId)).forEach(d -> rows.add(List.of(
                 d.getCompany().getName(), value(d.getCompany().getWebsite()),
                 value(d.getCompany().getHrContactEmail()), value(d.getTitle()), d.getStatus().name(),
                 formatDate(d.getApplicationDeadline()), value(d.getEmploymentType()),
@@ -71,13 +98,15 @@ public class PlacementReportService {
     }
 
     public byte[] companyHiring(Authentication auth, Long departmentId, boolean excel) {
+        return companyHiring(auth, departmentId, null, excel);
+    }
+
+    public byte[] companyHiring(Authentication auth, Long departmentId, Long academicYearId, boolean excel) {
         UserAccount user = authorization.staff(auth);
         departmentId = scopedDepartment(user, departmentId);
         List<CompanyHiringProjection> grouped = user.getRole() == UserRole.DTPO
-                ? applications.findCompanyHiringReportByDriveDepartment(ApplicationStatus.SELECTED, departmentId)
-                : departmentId == null
-                    ? applications.findCompanyHiringReport(ApplicationStatus.SELECTED)
-                    : applications.findCompanyHiringReportByStudentDepartment(ApplicationStatus.SELECTED, departmentId);
+                ? hiringByDriveDepartment(departmentId, academicYearId)
+                : departmentId == null ? hiringAll(academicYearId) : hiringByStudentDepartment(departmentId, academicYearId);
         List<List<String>> rows = new ArrayList<>();
         rows.add(List.of("Company", "Department", "Students hired", "Placement drive", "CTC", "Placement date"));
         Map<Long, Long> totals = new LinkedHashMap<>();
@@ -90,17 +119,110 @@ public class PlacementReportService {
     }
 
     public byte[] students(Authentication auth, Long departmentId, boolean excel) {
+        return students(auth, departmentId, null, excel);
+    }
+
+    public byte[] students(Authentication auth, Long departmentId, Long academicYearId, boolean excel) {
         UserAccount user = authorization.staff(auth);
         if (user.getRole() == UserRole.DTPO && !Objects.equals(user.getDepartment().getId(), departmentId == null ? user.getDepartment().getId() : departmentId))
             throw forbidden("DTPO cannot export another department");
         List<Student> source = departmentId == null ? students.findAll() : students.findAllByDepartment_IdOrderByUser_FullNameAsc(departmentId);
         List<List<String>> rows = new ArrayList<>();
-        rows.add(List.of("Student name", "Enrollment number", "Email", "Phone", "Department", "Program", "Semester", "Graduation year", "CGPA"));
+        rows.add(List.of("Student name", "Enrollment number", "Email", "Phone", "Department", "Program", "Semester", "Graduation year", "CGPA", "Academic year"));
         source.stream().filter(s -> departmentId == null || s.getDepartment().getId().equals(departmentId))
                 .filter(s -> user.getRole() == UserRole.UTPO || s.getDepartment().getId().equals(user.getDepartment().getId()))
                 .forEach(s -> rows.add(List.of(s.getUser().getFullName(), s.getEnrollmentNumber(), s.getUser().getUniversityEmail(),
                         value(s.getPhoneNumber()), s.getDepartment().getName(), value(s.getAcademicProgram()), value(s.getCurrentSemester()),
-                        value(s.getGraduationYear()), value(s.getCgpa()))));
+                        value(s.getGraduationYear()), value(s.getCgpa()), academicYearId == null ? "All years" : "Not applicable: no student registration year exists")));
+        return render(rows, excel);
+    }
+
+    public byte[] placementStatistics(Authentication auth, Long departmentId, Long academicYearId, boolean excel) {
+        UserAccount user = authorization.staff(auth);
+        departmentId = scopedDepartment(user, departmentId);
+        List<PlacementApplication> scopedApplications = scopedApplications(user, departmentId, academicYearId);
+        List<Student> scopedStudents = scopedStudents(user, departmentId);
+        long placed = scopedApplications.stream().filter(a -> a.getStatus() == ApplicationStatus.SELECTED).map(a -> a.getStudent().getId()).distinct().count();
+        List<PlacementDrive> scopedDrives = scopedDrives(user, departmentId, academicYearId);
+        List<BigDecimal> packages = scopedDrives.stream().map(PlacementDrive::getCtcAmount).filter(Objects::nonNull).toList();
+        long companies = scopedDrives.stream().map(d -> d.getCompany().getId()).distinct().count();
+        List<List<String>> rows = new ArrayList<>();
+        rows.add(List.of("Academic year", "Eligible students", "Placed students", "Unplaced students", "Placement percentage", "Companies", "Drives", "Average package", "Highest package", "Lowest package"));
+        rows.add(List.of(yearLabel(academicYearId), value(scopedStudents.size()), value(placed), value(Math.max(0, scopedStudents.size() - placed)),
+                scopedStudents.isEmpty() ? "0%" : String.format("%.2f%%", placed * 100.0 / scopedStudents.size()), value(companies), value(scopedDrives.size()),
+                formatPackageAverage(packages), packages.isEmpty() ? "" : formatCtc(packages.stream().max(BigDecimal::compareTo).orElse(null), "INR"),
+                packages.isEmpty() ? "" : formatCtc(packages.stream().min(BigDecimal::compareTo).orElse(null), "INR")));
+        return render(rows, excel);
+    }
+
+    public byte[] departmentPerformance(Authentication auth, Long departmentId, Long academicYearId, boolean excel) {
+        UserAccount user = authorization.staff(auth);
+        departmentId = scopedDepartment(user, departmentId);
+        List<Student> source = scopedStudents(user, departmentId);
+        Map<Long, List<Student>> byDepartment = new LinkedHashMap<>();
+        source.forEach(s -> byDepartment.computeIfAbsent(s.getDepartment().getId(), ignored -> new ArrayList<>()).add(s));
+        List<PlacementApplication> selected = scopedApplications(user, departmentId, academicYearId).stream().filter(a -> a.getStatus() == ApplicationStatus.SELECTED).toList();
+        List<List<String>> rows = new ArrayList<>();
+        rows.add(List.of("Department", "Eligible students", "Placed students", "Unplaced students", "Placement percentage", "Companies", "Average package", "Highest package"));
+        byDepartment.forEach((id, departmentStudents) -> {
+            List<PlacementApplication> deptSelected = selected.stream().filter(a -> a.getStudent().getDepartment().getId().equals(id)).toList();
+            List<BigDecimal> packages = deptSelected.stream().map(a -> a.getDrive().getCtcAmount()).filter(Objects::nonNull).toList();
+            long count = deptSelected.stream().map(a -> a.getStudent().getId()).distinct().count();
+            rows.add(List.of(departmentStudents.get(0).getDepartment().getName(), value(departmentStudents.size()), value(count), value(Math.max(0, departmentStudents.size() - count)),
+                    departmentStudents.isEmpty() ? "0%" : String.format("%.2f%%", count * 100.0 / departmentStudents.size()),
+                    value(deptSelected.stream().map(a -> a.getDrive().getCompany().getId()).distinct().count()), formatPackageAverage(packages),
+                    packages.isEmpty() ? "" : formatCtc(packages.stream().max(BigDecimal::compareTo).orElse(null), "INR")));
+        });
+        return render(rows, excel);
+    }
+
+    public byte[] packageAnalysis(Authentication auth, Long departmentId, Long academicYearId, boolean excel) {
+        UserAccount user = authorization.staff(auth);
+        departmentId = scopedDepartment(user, departmentId);
+        List<PlacementApplication> selected = scopedApplications(user, departmentId, academicYearId).stream().filter(a -> a.getStatus() == ApplicationStatus.SELECTED).toList();
+        Map<Long, List<PlacementApplication>> groups = new LinkedHashMap<>();
+        selected.forEach(a -> groups.computeIfAbsent(a.getDrive().getId(), ignored -> new ArrayList<>()).add(a));
+        List<List<String>> rows = new ArrayList<>();
+        rows.add(List.of("Company", "Placement drive", "Department", "Annual package", "Selected students"));
+        groups.values().forEach(group -> { PlacementDrive d = group.get(0).getDrive(); rows.add(List.of(d.getCompany().getName(), d.getTitle(), d.getDepartment() == null ? "University-wide" : d.getDepartment().getName(), formatCtc(d.getCtcAmount(), d.getCtcCurrency()), value(group.stream().map(a -> a.getStudent().getId()).distinct().count()))); });
+        return render(rows, excel);
+    }
+
+    public byte[] driveParticipation(Authentication auth, Long departmentId, Long academicYearId, boolean excel) {
+        UserAccount user = authorization.staff(auth);
+        departmentId = scopedDepartment(user, departmentId);
+        List<PlacementApplication> scoped = scopedApplications(user, departmentId, academicYearId);
+        Map<Long, List<PlacementApplication>> groups = new LinkedHashMap<>();
+        scoped.forEach(a -> groups.computeIfAbsent(a.getDrive().getId(), ignored -> new ArrayList<>()).add(a));
+        List<List<String>> rows = new ArrayList<>();
+        rows.add(List.of("Company", "Placement drive", "Academic year", "Department", "Applicants", "Selected students", "Rejected students", "Drive status"));
+        groups.values().forEach(group -> { PlacementDrive d = group.get(0).getDrive(); rows.add(List.of(d.getCompany().getName(), d.getTitle(), d.getAcademicYear().getLabel(), d.getDepartment() == null ? "University-wide" : d.getDepartment().getName(), value(group.stream().map(a -> a.getStudent().getId()).distinct().count()), value(group.stream().filter(a -> a.getStatus() == ApplicationStatus.SELECTED).map(a -> a.getStudent().getId()).distinct().count()), value(group.stream().filter(a -> a.getStatus() == ApplicationStatus.REJECTED || a.getStatus() == ApplicationStatus.APPLICATION_REJECTED).map(a -> a.getStudent().getId()).distinct().count()), d.getStatus().name())); });
+        return render(rows, excel);
+    }
+
+    public byte[] roundResults(Authentication auth, Long departmentId, Long academicYearId, boolean excel) {
+        UserAccount user = authorization.staff(auth);
+        departmentId = scopedDepartment(user, departmentId);
+        final Long scopedDepartmentId = departmentId;
+        List<RoundResult> results = roundResults.findAll().stream().filter(r -> inScope(user, r.getRound().getDrive()) && inYear(r.getRound().getDrive(), academicYearId)
+                && (scopedDepartmentId == null || r.getApplication().getStudent().getDepartment().getId().equals(scopedDepartmentId))).toList();
+        Map<Long, List<RoundResult>> groups = new LinkedHashMap<>();
+        results.forEach(r -> groups.computeIfAbsent(r.getRound().getId(), ignored -> new ArrayList<>()).add(r));
+        List<List<String>> rows = new ArrayList<>();
+        rows.add(List.of("Company", "Drive", "Round", "Department", "Students participating", "Passed", "Failed", "Pending"));
+        groups.values().forEach(group -> { RecruitmentRound round = group.get(0).getRound(); rows.add(List.of(round.getDrive().getCompany().getName(), round.getDrive().getTitle(), round.getName(), round.getDrive().getDepartment() == null ? "University-wide" : round.getDrive().getDepartment().getName(), value(group.size()), value(group.stream().filter(r -> r.getResult() == RoundResultStatus.PASSED).count()), value(group.stream().filter(r -> r.getResult() == RoundResultStatus.FAILED).count()), value(group.stream().filter(r -> r.getResult() == RoundResultStatus.PENDING).count()))); });
+        return render(rows, excel);
+    }
+
+    public byte[] unplacedStudents(Authentication auth, Long departmentId, Long academicYearId, boolean excel) {
+        UserAccount user = authorization.staff(auth);
+        departmentId = scopedDepartment(user, departmentId);
+        List<Student> source = scopedStudents(user, departmentId);
+        List<PlacementApplication> scoped = scopedApplications(user, departmentId, academicYearId);
+        java.util.Set<Long> placed = scoped.stream().filter(a -> a.getStatus() == ApplicationStatus.SELECTED).map(a -> a.getStudent().getId()).collect(java.util.stream.Collectors.toSet());
+        List<List<String>> rows = new ArrayList<>();
+        rows.add(List.of("Enrollment number", "Student name", "Department", "Applications submitted", "Latest application status"));
+        source.stream().filter(s -> !placed.contains(s.getId())).forEach(s -> { List<PlacementApplication> own = scoped.stream().filter(a -> a.getStudent().getId().equals(s.getId())).toList(); String latest = own.isEmpty() ? "NO_APPLICATION" : own.get(own.size() - 1).getStatus().name(); rows.add(List.of(s.getEnrollmentNumber(), s.getUser().getFullName(), s.getDepartment().getName(), value(own.size()), latest)); });
         return render(rows, excel);
     }
 
@@ -147,6 +269,52 @@ public class PlacementReportService {
     private boolean inScope(UserAccount user, PlacementDrive drive) {
         return user.getRole() == UserRole.UTPO || (drive.getDepartment() != null && user.getDepartment() != null
                 && drive.getDepartment().getId().equals(user.getDepartment().getId()));
+    }
+
+    private boolean inYear(PlacementDrive drive, Long academicYearId) {
+        return academicYearId == null || (drive.getAcademicYear() != null
+                && academicYearId.equals(drive.getAcademicYear().getId()));
+    }
+
+    private List<CompanyHiringProjection> hiringAll(Long yearId) {
+        return yearId == null ? applications.findCompanyHiringReport(ApplicationStatus.SELECTED)
+                : applications.findCompanyHiringReport(ApplicationStatus.SELECTED, yearId);
+    }
+
+    private List<CompanyHiringProjection> hiringByStudentDepartment(Long departmentId, Long yearId) {
+        return yearId == null ? applications.findCompanyHiringReportByStudentDepartment(ApplicationStatus.SELECTED, departmentId)
+                : applications.findCompanyHiringReportByStudentDepartment(ApplicationStatus.SELECTED, departmentId, yearId);
+    }
+
+    private List<CompanyHiringProjection> hiringByDriveDepartment(Long departmentId, Long yearId) {
+        return yearId == null ? applications.findCompanyHiringReportByDriveDepartment(ApplicationStatus.SELECTED, departmentId)
+                : applications.findCompanyHiringReportByDriveDepartment(ApplicationStatus.SELECTED, departmentId, yearId);
+    }
+
+    private List<Student> scopedStudents(UserAccount user, Long departmentId) {
+        List<Student> source = departmentId == null ? students.findAll() : students.findAllByDepartment_IdOrderByUser_FullNameAsc(departmentId);
+        return source.stream().filter(s -> user.getRole() == UserRole.UTPO || (user.getDepartment() != null && s.getDepartment().getId().equals(user.getDepartment().getId()))).toList();
+    }
+
+    private List<PlacementApplication> scopedApplications(UserAccount user, Long departmentId, Long academicYearId) {
+        return applications.findAll().stream().filter(a -> inScope(user, a.getDrive()) && inYear(a.getDrive(), academicYearId)
+                && (departmentId == null || a.getStudent().getDepartment().getId().equals(departmentId))).toList();
+    }
+
+    private List<PlacementDrive> scopedDrives(UserAccount user, Long departmentId, Long academicYearId) {
+        return drives.findAll().stream().filter(d -> inScope(user, d) && inYear(d, academicYearId)
+                && (departmentId == null || (d.getDepartment() != null && d.getDepartment().getId().equals(departmentId)))).toList();
+    }
+
+    private String yearLabel(Long academicYearId) {
+        if (academicYearId == null) return "All academic years";
+        return academicYears.findById(academicYearId).map(AcademicYear::getLabel).orElse("Unknown year");
+    }
+
+    private String formatPackageAverage(List<BigDecimal> values) {
+        if (values.isEmpty()) return "";
+        BigDecimal average = values.stream().reduce(BigDecimal.ZERO, BigDecimal::add).divide(BigDecimal.valueOf(values.size()), 2, RoundingMode.HALF_UP);
+        return formatCtc(average, "INR");
     }
 
     private byte[] render(List<List<String>> rows, boolean excel) {

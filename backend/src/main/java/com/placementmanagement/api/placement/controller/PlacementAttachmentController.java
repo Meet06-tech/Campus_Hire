@@ -1,6 +1,7 @@
 package com.placementmanagement.api.placement.controller;
 
 import java.util.List;
+import java.nio.charset.StandardCharsets;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.*;
 import org.springframework.security.core.Authentication;
@@ -21,7 +22,12 @@ public class PlacementAttachmentController {
     public AttachmentResponse upload(@PathVariable Long driveId, @RequestPart("file") MultipartFile file, Authentication auth) { return service.upload(auth, driveId, file); }
     @GetMapping("/{attachmentId}")
     public ResponseEntity<ByteArrayResource> download(@PathVariable Long driveId, @PathVariable Long attachmentId, Authentication auth) {
-        StoredAttachment file = service.download(auth, attachmentId);
-        return ResponseEntity.ok().contentType(MediaType.parseMediaType(file.contentType())).header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + file.fileName() + "\"").body(new ByteArrayResource(file.bytes()));
+        StoredAttachment file = service.download(auth, driveId, attachmentId);
+        return ResponseEntity.ok().contentType(MediaType.parseMediaType(file.contentType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename(file.fileName(), StandardCharsets.UTF_8).build().toString())
+                .header("X-Content-Type-Options", "nosniff")
+                .cacheControl(CacheControl.noStore())
+                .body(new ByteArrayResource(file.bytes()));
     }
 }

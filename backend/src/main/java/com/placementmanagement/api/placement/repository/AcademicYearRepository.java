@@ -6,4 +6,5 @@ import com.placementmanagement.api.placement.entity.AcademicYear;
 
 public interface AcademicYearRepository extends JpaRepository<AcademicYear, Long> {
     Optional<AcademicYear> findByStatus(String status);
+    java.util.List<AcademicYear> findAllByOrderByLabelDesc();
 }

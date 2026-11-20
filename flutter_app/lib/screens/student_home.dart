@@ -1,10 +1,11 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 
 import '../models/placement_attachment.dart';
 import '../models/placement_models.dart';
 import '../services/placement_api.dart';
+import '../services/attachment_saver.dart';
+import '../services/attachment_opener.dart';
 import 'profile_page.dart';
 import 'settings_page.dart';
 import 'announcements_page.dart';
@@ -417,12 +418,14 @@ class DriveDetailsPage extends StatefulWidget {
     required this.drive,
     required this.onSessionExpired,
     required this.onApplicationChanged,
+    this.attachmentSaver,
   });
 
   final PlacementApi api;
   final PlacementDrive drive;
   final VoidCallback onSessionExpired;
   final VoidCallback onApplicationChanged;
+  final Future<String> Function(Uint8List, String)? attachmentSaver;
 
   @override
   State<DriveDetailsPage> createState() => _DriveDetailsPageState();
@@ -432,7 +435,107 @@ class _DriveDetailsPageState extends State<DriveDetailsPage> {
   bool _applying = false;
   bool _attachmentsLoading = true;
   List<PlacementAttachment> _attachments = const [];
+  List<PlacementAttachment> _companyAttachments = const [];
+  String? _attachmentsError;
+  String? _downloadingAttachment;
   String? _error;
+
+  Future<void> _download(
+    PlacementAttachment file, {
+    required bool company,
+  }) async {
+    final identity = '${company ? 'company' : 'drive'}-${file.id}';
+    if (_downloadingAttachment != null) return;
+    setState(() => _downloadingAttachment = identity);
+    try {
+      final bytes = company
+          ? await widget.api.downloadCompanyAttachment(
+              widget.drive.company.id,
+              file,
+            )
+          : await widget.api.downloadDriveAttachment(widget.drive.id, file);
+      final location = await (widget.attachmentSaver ?? saveAttachment)(
+        bytes,
+        '$identity-${file.fileName}',
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Saved ${file.fileName} to $location'),
+            action: kIsWeb
+                ? null
+                : SnackBarAction(
+                    label: 'Open',
+                    onPressed: () async {
+                      try {
+                        if (await openAttachment(location)) return;
+                      } catch (_) {
+                        // The saved file remains available even if no viewer can open it.
+                      }
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'No app could open this file. It remains saved in CampusHire documents.',
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+          ),
+        );
+      }
+    } on ApiException catch (error) {
+      if (error.statusCode == 401) {
+        widget.onSessionExpired();
+      } else if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not save the attachment. Please try again.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _downloadingAttachment = null);
+      }
+    }
+  }
+
+  Widget _attachmentCard(
+    String title,
+    List<PlacementAttachment> files, {
+    required bool company,
+  }) => _DetailsCard(
+    title: title,
+    icon: Icons.attach_file_rounded,
+    child: Column(
+      children: files.map((file) {
+        final identity = '${company ? 'company' : 'drive'}-${file.id}';
+        return ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.insert_drive_file_outlined),
+          title: Text(file.fileName),
+          subtitle: Text(file.contentType),
+          trailing: _downloadingAttachment == identity
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.download_outlined),
+          enabled: _downloadingAttachment == null,
+          onTap: () => _download(file, company: company),
+        );
+      }).toList(),
+    ),
+  );
 
   Future<void> _apply() async {
     setState(() {
@@ -464,18 +567,26 @@ class _DriveDetailsPageState extends State<DriveDetailsPage> {
   @override
   void initState() {
     super.initState();
-    widget.api
-        .fetchDriveAttachments(widget.drive.id)
+    Future.wait([
+          widget.api.fetchDriveAttachments(widget.drive.id),
+          widget.api.fetchCompanyAttachments(widget.drive.company.id),
+        ])
         .then((items) {
           if (mounted) {
             setState(() {
-              _attachments = items;
+              _attachments = items[0];
+              _companyAttachments = items[1];
               _attachmentsLoading = false;
             });
           }
         })
         .catchError((_) {
-          if (mounted) setState(() => _attachmentsLoading = false);
+          if (mounted) {
+            setState(() {
+              _attachmentsError = 'Attachments could not be loaded.';
+              _attachmentsLoading = false;
+            });
+          }
         });
   }
 
@@ -557,25 +668,19 @@ class _DriveDetailsPageState extends State<DriveDetailsPage> {
                   icon: Icons.assignment_late_outlined,
                   child: Text(drive.bondDetails!),
                 ),
+              if (_attachmentsLoading) const LinearProgressIndicator(),
+              if (_attachmentsError != null) Text(_attachmentsError!),
+              if (!_attachmentsLoading && _companyAttachments.isNotEmpty)
+                _attachmentCard(
+                  'Company attachments',
+                  _companyAttachments,
+                  company: true,
+                ),
               if (!_attachmentsLoading && _attachments.isNotEmpty)
-                _DetailsCard(
-                  title: 'Attachments',
-                  icon: Icons.attach_file_rounded,
-                  child: Column(
-                    children: _attachments
-                        .map(
-                          (file) => ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            leading: const Icon(
-                              Icons.insert_drive_file_outlined,
-                            ),
-                            title: Text(file.fileName),
-                            subtitle: Text(file.contentType),
-                            trailing: const Icon(Icons.download_outlined),
-                          ),
-                        )
-                        .toList(),
-                  ),
+                _attachmentCard(
+                  'Drive attachments',
+                  _attachments,
+                  company: false,
                 ),
               _DetailsCard(
                 title: 'Eligibility Criteria',

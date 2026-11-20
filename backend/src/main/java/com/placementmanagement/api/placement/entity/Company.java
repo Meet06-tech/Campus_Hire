@@ -36,6 +36,16 @@ public class Company {
         this.name = name; this.description = description; this.website = website; this.hrContactName = hrContactName;
         this.hrContactEmail = hrContactEmail; this.hrContactPhone = hrContactPhone; this.active = true;
     }
+    public void updateDetails(String name, String description, String website, String hrContactName,
+            String hrContactEmail, String hrContactPhone) {
+        this.name = name;
+        this.description = description;
+        this.website = website;
+        this.hrContactName = hrContactName;
+        this.hrContactEmail = hrContactEmail;
+        this.hrContactPhone = hrContactPhone;
+        this.updatedAt = Instant.now();
+    }
     public void updateOptionalDetails(String employmentType, String positionType, String defaultLocation, java.math.BigDecimal ctcAmount,
             String ctcCurrency, String stipendType, java.math.BigDecimal stipendMinAmount, java.math.BigDecimal stipendMaxAmount,
             String stipendCurrency, String stipendPaymentPeriod, String otherBenefits, String bondDetails) {

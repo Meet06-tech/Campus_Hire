@@ -27,13 +27,27 @@ class PlacementApi {
 
   static String get _defaultBaseUrl {
     const configured = String.fromEnvironment('API_BASE_URL');
+    return resolveBaseUrl(
+      configured: configured,
+      isWeb: kIsWeb,
+      platform: defaultTargetPlatform,
+    );
+  }
+
+  @visibleForTesting
+  static String resolveBaseUrl({
+    required String configured,
+    required bool isWeb,
+    required TargetPlatform platform,
+  }) {
     if (configured.isNotEmpty) return configured;
-    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+    if (isWeb || platform != TargetPlatform.android) {
       return 'http://localhost:8080/api';
     }
-    // Android emulators expose the host machine through 10.0.2.2.
-    // Physical devices should use --dart-define=API_BASE_URL=... or adb reverse.
-    return 'http://10.0.2.2:8080/api';
+    // The project uses a physical Android device with adb reverse during local
+    // development. Android's loopback is therefore forwarded to the Mac.
+    // Emulators can override this with API_BASE_URL=http://10.0.2.2:8080/api.
+    return 'http://127.0.0.1:8080/api';
   }
 
   final String baseUrl;
@@ -309,6 +323,65 @@ class PlacementApi {
         .toList(growable: false);
   }
 
+  Future<List<PlacementAttachment>> fetchCompanyAttachments(
+    int companyId,
+  ) async {
+    final response = await _requestJson(
+      'GET',
+      '/placement/companies/$companyId/attachments',
+    );
+    if (response is! List) {
+      throw const ApiException('Invalid attachments response', 200);
+    }
+    return response
+        .map(
+          (item) => PlacementAttachment.fromJson(
+            Map<String, dynamic>.from(item as Map),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  Future<Uint8List> downloadDriveAttachment(
+    int driveId,
+    PlacementAttachment file,
+  ) => _downloadAttachment(
+    '/placement/drives/$driveId/attachments/${file.id}',
+    file,
+  );
+
+  Future<Uint8List> downloadCompanyAttachment(
+    int companyId,
+    PlacementAttachment file,
+  ) => _downloadAttachment(
+    '/placement/companies/$companyId/attachments/${file.id}',
+    file,
+  );
+
+  Future<Uint8List> _downloadAttachment(
+    String path,
+    PlacementAttachment file,
+  ) async {
+    final headers = <String, String>{};
+    if (_token != null) headers['Authorization'] = 'Bearer $_token';
+    final response = await http.get(
+      Uri.parse('$baseUrl$path'),
+      headers: headers,
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw ApiException(
+        'Attachment could not be downloaded',
+        response.statusCode,
+      );
+    }
+    if (response.bodyBytes.isEmpty ||
+        (file.sizeBytes > 0 && response.bodyBytes.length != file.sizeBytes) ||
+        response.headers['content-type']?.startsWith('text/html') == true) {
+      throw const ApiException('The downloaded attachment is invalid', 200);
+    }
+    return response.bodyBytes;
+  }
+
   Future<PlacementApplication> applyToDrive(int driveId) async {
     final response = await _postJson(
       'POST',
@@ -411,25 +484,56 @@ class PlacementApi {
   }) async {
     final headers = <String, String>{'Content-Type': 'application/json'};
     if (_token != null) headers['Authorization'] = 'Bearer $_token';
-    final request = http.Request(method, Uri.parse('$baseUrl$path'))
-      ..headers.addAll(headers);
+    final uri = Uri.parse('$baseUrl$path');
+    final request = http.Request(method, uri)..headers.addAll(headers);
     if (body != null) request.body = jsonEncode(body);
 
     final client = http.Client();
+    final timer = Stopwatch()..start();
     late http.Response response;
     try {
+      if (kDebugMode) {
+        debugPrint('[CampusHire HTTP] $method $uri started');
+      }
       final streamed = await client
           .send(request)
           .timeout(const Duration(seconds: 15));
       response = await http.Response.fromStream(streamed);
-    } on TimeoutException {
+      if (kDebugMode) {
+        debugPrint(
+          '[CampusHire HTTP] $method $uri -> ${response.statusCode} '
+          'in ${timer.elapsedMilliseconds} ms',
+        );
+      }
+    } on TimeoutException catch (error) {
+      if (kDebugMode) {
+        debugPrint(
+          '[CampusHire HTTP] $method $uri failed after '
+          '${timer.elapsedMilliseconds} ms: ${error.runtimeType}: $error',
+        );
+      }
       throw const ApiException('The server took too long to respond.', 0);
-    } on http.ClientException {
+    } on http.ClientException catch (error) {
+      if (kDebugMode) {
+        debugPrint(
+          '[CampusHire HTTP] $method $uri failed after '
+          '${timer.elapsedMilliseconds} ms: ${error.runtimeType}: $error',
+        );
+      }
       throw const ApiException(
         'Cannot reach the server. Check that the backend is running and the app is using the correct host.',
         0,
       );
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint(
+          '[CampusHire HTTP] $method $uri failed after '
+          '${timer.elapsedMilliseconds} ms: ${error.runtimeType}: $error',
+        );
+      }
+      rethrow;
     } finally {
+      timer.stop();
       client.close();
     }
     final text = response.body;

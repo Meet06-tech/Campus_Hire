@@ -4,7 +4,7 @@ import { Observable } from 'rxjs';
 import { HttpParams } from '@angular/common/http';
 
 import { environment } from '../../../environments/environment';
-import { Announcement, AnnouncementRequest, ApplicationResponse, ApplicationStatus, Company, CompanyRequest, Coordinator, CoordinatorRequest, DashboardSummary, DepartmentInfo, DriveRequest, PlacementAttachment, PlacementDrive, RecruitmentRound, RoundCandidate, RoundRequest, StaffApplication, StaffApplicationPage, StaffStudentPage } from '../models/placement.models';
+import { AcademicYear, Announcement, AnnouncementRequest, ApplicationResponse, ApplicationStatus, Company, CompanyRequest, Coordinator, CoordinatorRequest, DashboardSummary, DepartmentInfo, DriveRequest, PlacementAttachment, PlacementDrive, RecruitmentRound, RoundCandidate, RoundRequest, StaffApplication, StaffApplicationPage, StaffStudentPage } from '../models/placement.models';
 
 @Injectable({ providedIn: 'root' })
 export class PlacementService {
@@ -55,9 +55,11 @@ export class PlacementService {
   archiveDrive(driveId: number): Observable<PlacementDrive> {
     return this.http.post<PlacementDrive>(`${this.apiUrl}/api/placement/drives/${driveId}/archive`, {});
   }
-  downloadReport(path: string, departmentId?: number): Observable<Blob> {
+  listReportYears(): Observable<AcademicYear[]> { return this.http.get<AcademicYear[]>(`${this.apiUrl}/api/placement/reports/academic-years`); }
+  downloadReport(path: string, departmentId?: number, academicYearId?: number): Observable<Blob> {
     let params = new HttpParams();
     if (departmentId !== undefined) params = params.set('departmentId', departmentId);
+    if (academicYearId !== undefined) params = params.set('academicYearId', academicYearId);
     return this.http.get(`${this.apiUrl}/api/placement/reports/${path}`, { params, responseType: 'blob' });
   }
   uploadAttachment(driveId: number, file: File): Observable<unknown> {
