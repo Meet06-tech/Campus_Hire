@@ -53,6 +53,27 @@ import com.placementmanagement.api.placement.service.PlacementService;
 
 @ExtendWith(MockitoExtension.class)
 class PlacementServiceTest {
+    @Test
+    void editingCompanyUpdatesExistingCoreFieldsWithoutCreatingAnotherCompany() {
+        UserAccount staff = mock(UserAccount.class);
+        when(authorization.staff(authentication)).thenReturn(staff);
+        Company existing = new Company("ABC Technologies", "Old profile", null, null, null, null);
+        when(companies.findById(4L)).thenReturn(Optional.of(existing));
+        when(companies.save(existing)).thenReturn(existing);
+
+        var updated = service.updateCompany(authentication, 4L,
+                new CompanyRequest("XYZ Technologies", "New profile", "https://example.org",
+                        "HR Name", "hr@example.org", "12345"));
+
+        assertEquals("XYZ Technologies", updated.name());
+        assertEquals("New profile", updated.description());
+        assertEquals("https://example.org", updated.website());
+        assertEquals("HR Name", updated.hrContactName());
+        assertEquals("hr@example.org", updated.hrContactEmail());
+        assertEquals("12345", updated.hrContactPhone());
+        verify(companies).findById(4L);
+        verify(companies, times(1)).save(existing);
+    }
     @Mock CompanyRepository companies;
     @Mock PlacementProgramRepository programs;
     @Mock PlacementDriveRepository drives;

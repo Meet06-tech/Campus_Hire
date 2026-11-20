@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,11 +5,23 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:placement_management_app/main.dart';
 import 'package:placement_management_app/models/announcement.dart';
 import 'package:placement_management_app/models/student_directory.dart';
+import 'package:placement_management_app/models/placement_attachment.dart';
 import 'package:placement_management_app/models/placement_models.dart';
 import 'package:placement_management_app/screens/student_home.dart';
 import 'package:placement_management_app/services/placement_api.dart';
 
 void main() {
+  test('physical Android defaults to the adb reverse loopback URL', () {
+    expect(
+      PlacementApi.resolveBaseUrl(
+        configured: '',
+        isWeb: false,
+        platform: TargetPlatform.android,
+      ),
+      'http://127.0.0.1:8080/api',
+    );
+  });
+
   testWidgets('shows the welcome and authentication screens', (
     WidgetTester tester,
   ) async {
@@ -67,30 +77,47 @@ void main() {
     expect(find.text('Change Password'), findsOneWidget);
   });
 
-  testWidgets('new student session loads its own photo after the previous shell is removed', (
-    WidgetTester tester,
-  ) async {
-    final firstPhoto = (await rootBundle.load('assets/images/charusat_logo.png'))
-        .buffer.asUint8List();
-    final secondPhoto = (await rootBundle.load('assets/images/cdpc_logo_square.png'))
-        .buffer.asUint8List();
+  testWidgets(
+    'new student session loads its own photo after the previous shell is removed',
+    (WidgetTester tester) async {
+      final firstPhoto = (await rootBundle.load(
+        'assets/images/charusat_logo.png',
+      )).buffer.asUint8List();
+      final secondPhoto = (await rootBundle.load(
+        'assets/images/cdpc_logo_square.png',
+      )).buffer.asUint8List();
 
-    Future<void> showPhoto(Uint8List bytes) async {
-      await tester.pumpWidget(MaterialApp(
-        home: StudentHomeShell(api: _FakePlacementApi(photo: bytes), onLogout: () {}),
-      ));
-      await tester.pumpAndSettle();
-      final avatar = tester.widget<CircleAvatar>(find.byWidgetPredicate(
-        (widget) => widget is CircleAvatar && widget.backgroundImage is MemoryImage,
-      ).first);
-      expect((avatar.backgroundImage! as MemoryImage).bytes, orderedEquals(bytes));
-    }
+      Future<void> showPhoto(Uint8List bytes) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: StudentHomeShell(
+              api: _FakePlacementApi(photo: bytes),
+              onLogout: () {},
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final avatar = tester.widget<CircleAvatar>(
+          find
+              .byWidgetPredicate(
+                (widget) =>
+                    widget is CircleAvatar &&
+                    widget.backgroundImage is MemoryImage,
+              )
+              .first,
+        );
+        expect(
+          (avatar.backgroundImage! as MemoryImage).bytes,
+          orderedEquals(bytes),
+        );
+      }
 
-    await showPhoto(firstPhoto);
-    await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pump();
-    await showPhoto(secondPhoto);
-  });
+      await showPhoto(firstPhoto);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      await showPhoto(secondPhoto);
+    },
+  );
 
   testWidgets('theme toggle switches repeatedly between dark and light mode', (
     WidgetTester tester,
@@ -117,6 +144,96 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byTooltip('Switch to light mode'), findsOneWidget);
   });
+
+  testWidgets(
+    'drive details offers real download actions for company and drive files',
+    (WidgetTester tester) async {
+      final api = _FakeAttachmentApi();
+      final savedNames = <String>[];
+      final drive = PlacementDrive.fromJson({
+        'id': 9,
+        'company': {'id': 4, 'name': 'Example Company'},
+        'title': 'Graduate role',
+        'status': 'PUBLISHED',
+      });
+      await tester.pumpWidget(
+        MaterialApp(
+          home: DriveDetailsPage(
+            api: api,
+            drive: drive,
+            onSessionExpired: () {},
+            onApplicationChanged: () {},
+            attachmentSaver: (bytes, name) async {
+              expect(bytes, orderedEquals([1, 2, 3]));
+              savedNames.add(name);
+              return 'test-downloads/$name';
+            },
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('company.pdf'),
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text('company.pdf'));
+      await tester.pumpAndSettle();
+      expect(api.lastDownload, 'company-4-1');
+      await tester.scrollUntilVisible(
+        find.text('drive.pdf'),
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text('drive.pdf'));
+      await tester.pumpAndSettle();
+      expect(api.lastDownload, 'drive-9-2');
+      expect(savedNames, ['company-1-company.pdf', 'drive-2-drive.pdf']);
+    },
+  );
+}
+
+class _FakeAttachmentApi extends _FakePlacementApi {
+  String? lastDownload;
+  final companyFile = const PlacementAttachment(
+    id: 1,
+    fileName: 'company.pdf',
+    contentType: 'application/pdf',
+    sizeBytes: 3,
+  );
+  final driveFile = const PlacementAttachment(
+    id: 2,
+    fileName: 'drive.pdf',
+    contentType: 'application/pdf',
+    sizeBytes: 3,
+  );
+
+  @override
+  Future<List<PlacementAttachment>> fetchCompanyAttachments(
+    int companyId,
+  ) async => [companyFile];
+
+  @override
+  Future<List<PlacementAttachment>> fetchDriveAttachments(int driveId) async =>
+      [driveFile];
+
+  @override
+  Future<Uint8List> downloadCompanyAttachment(
+    int companyId,
+    PlacementAttachment file,
+  ) async {
+    lastDownload = 'company-$companyId-${file.id}';
+    return Uint8List.fromList([1, 2, 3]);
+  }
+
+  @override
+  Future<Uint8List> downloadDriveAttachment(
+    int driveId,
+    PlacementAttachment file,
+  ) async {
+    lastDownload = 'drive-$driveId-${file.id}';
+    return Uint8List.fromList([1, 2, 3]);
+  }
 }
 
 class _FakePlacementApi extends PlacementApi {

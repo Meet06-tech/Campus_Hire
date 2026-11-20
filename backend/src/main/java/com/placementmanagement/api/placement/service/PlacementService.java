@@ -72,8 +72,15 @@ public class PlacementService {
         if (request == null) throw bad("Company is required");
         Company company = companies.findById(companyId).orElseThrow(() -> notFound("Company"));
         String name = required(request.name(), "Company name");
+        company.updateDetails(name, request.description(), request.website(), request.hrContactName(),
+                request.hrContactEmail(), request.hrContactPhone());
         company.updateOptionalDetails(request.employmentType(), request.positionType(), request.defaultLocation(), request.ctcAmount(), request.ctcCurrency(),
-                request.stipendType(), request.stipendMinAmount(), request.stipendMaxAmount(), request.stipendCurrency(), request.stipendPaymentPeriod(), request.otherBenefits(), request.bondDetails());
+                request.stipendType() == null ? company.getStipendType() : request.stipendType(),
+                request.stipendMinAmount() == null ? company.getStipendMinAmount() : request.stipendMinAmount(),
+                request.stipendMaxAmount() == null ? company.getStipendMaxAmount() : request.stipendMaxAmount(),
+                request.stipendCurrency() == null ? company.getStipendCurrency() : request.stipendCurrency(),
+                request.stipendPaymentPeriod() == null ? company.getStipendPaymentPeriod() : request.stipendPaymentPeriod(),
+                request.otherBenefits(), request.bondDetails());
         company.setStipend(request.stipend());
         return company(companies.save(company));
     }

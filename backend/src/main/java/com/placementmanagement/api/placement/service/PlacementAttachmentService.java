@@ -18,9 +18,11 @@ public class PlacementAttachmentService {
     private final PlacementDriveAttachmentRepository attachments;
     private final PlacementAuthorizationService authorization;
     private final PlacementAttachmentStorageService storage;
+    private final PlacementService placement;
     public PlacementAttachmentService(PlacementDriveRepository drives, PlacementDriveAttachmentRepository attachments,
-            PlacementAuthorizationService authorization, PlacementAttachmentStorageService storage) {
+            PlacementAuthorizationService authorization, PlacementAttachmentStorageService storage, PlacementService placement) {
         this.drives = drives; this.attachments = attachments; this.authorization = authorization; this.storage = storage;
+        this.placement = placement;
     }
     @Transactional(readOnly = true)
     public List<AttachmentResponse> list(Authentication auth, Long driveId) {
@@ -36,9 +38,12 @@ public class PlacementAttachmentService {
         try { return response(attachments.save(new PlacementDriveAttachment(drive, safeName(file), key, contentType(file), file.getSize()))); }
         catch (RuntimeException ex) { throw ex; }
     }
-    public StoredAttachment download(Authentication auth, Long attachmentId) {
+    @Transactional(readOnly = true)
+    public StoredAttachment download(Authentication auth, Long driveId, Long attachmentId) {
+        access(auth, driveId);
         PlacementDriveAttachment attachment = attachments.findById(attachmentId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Attachment not found"));
-        access(auth, attachment.getDrive().getId());
+        if (!attachment.getDrive().getId().equals(driveId))
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Attachment not found");
         return new StoredAttachment(attachment.getOriginalFileName(), attachment.getContentType(), storage.read(attachment.getStorageKey()));
     }
     private PlacementDrive access(Authentication auth, Long driveId) {
@@ -50,7 +55,8 @@ public class PlacementAttachmentService {
         } catch (ResponseStatusException staffDenied) {
             var student = authorization.student(auth);
             if (drive.getStatus() != DriveStatus.PUBLISHED
-                    || (drive.getDepartment() != null && (student.getDepartment() == null || !drive.getDepartment().getId().equals(student.getDepartment().getId()))))
+                    || (drive.getDepartment() != null && (student.getDepartment() == null || !drive.getDepartment().getId().equals(student.getDepartment().getId())))
+                    || placement.listStudentDrives(auth).stream().noneMatch(visible -> visible.id().equals(driveId)))
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Attachment is not available");
         }
         return drive;

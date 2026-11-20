@@ -6,7 +6,7 @@ import { finalize, forkJoin, of } from 'rxjs';
 import { AuthService } from '../../../core/services/auth.service';
 import { PlacementService } from '../../../core/services/placement.service';
 import { MeResponse, StaffRole } from '../../../core/models/auth.models';
-import { Announcement, AnnouncementRequest, ApplicationStatus, Company, CompanyRequest, Coordinator, CoordinatorRequest, DashboardSummary, DepartmentInfo, DriveRequest, PlacementAttachment, PlacementDrive, RecruitmentRound, RoundCandidate, RoundRequest, StaffApplication, StaffStudent } from '../../../core/models/placement.models';
+import { AcademicYear, Announcement, AnnouncementRequest, ApplicationStatus, Company, CompanyRequest, Coordinator, CoordinatorRequest, DashboardSummary, DepartmentInfo, DriveRequest, PlacementAttachment, PlacementDrive, RecruitmentRound, RoundCandidate, RoundRequest, StaffApplication, StaffStudent } from '../../../core/models/placement.models';
 
 type DashboardSection = 'overview' | 'drives' | 'companies' | 'applications' | 'students' | 'reports' | 'announcements' | 'coordinators' | 'rounds';
 
@@ -73,6 +73,8 @@ export class StaffDashboardComponent implements OnInit {
   applicationSearch = signal('');
   reportDownloading = signal<string | null>(null);
   reportDepartmentId = signal<number | null>(null);
+  reportAcademicYearId = signal<number | null>(null);
+  reportAcademicYears = signal<AcademicYear[]>([]);
   announcementForm: AnnouncementRequest = { subject: '', title: '', message: '' };
 
   companyForm: CompanyRequest = this.emptyCompany();
@@ -110,17 +112,20 @@ export class StaffDashboardComponent implements OnInit {
       applications: this.placementService.listApplications(0, 100),
       students: this.placementService.listStudents(0, 100),
       summary: this.placementService.dashboardSummary(),
+      reportYears: this.placementService.listReportYears(),
       departments: this.role === 'UTPO' ? this.placementService.listDepartments() : of([] as DepartmentInfo[]),
       coordinators: this.role === 'UTPO' ? this.placementService.listCoordinators() : of([] as Coordinator[]),
       announcements: this.placementService.listAnnouncements()
     }).subscribe({
-      next: ({ user, companies, drives, applications, students, summary, departments, coordinators, announcements }) => {
+      next: ({ user, companies, drives, applications, students, summary, reportYears, departments, coordinators, announcements }) => {
         this.user.set(user);
         this.companies.set(companies);
         this.drives.set(drives);
         this.applications.set(applications.items);
         this.students.set(students.items);
         this.summary.set(summary);
+        this.reportAcademicYears.set(reportYears);
+        this.reportAcademicYearId.set(reportYears.find(year => year.status === 'ACTIVE')?.id ?? reportYears[0]?.id ?? null);
         this.departments.set(departments);
         this.coordinators.set(coordinators);
         this.announcements.set(announcements);
@@ -238,13 +243,20 @@ export class StaffDashboardComponent implements OnInit {
     if (this.reportDownloading()) return;
     this.reportDownloading.set(path);
     this.errorMessage.set(null);
-    this.placementService.downloadReport(path, departmentId).pipe(finalize(() => this.reportDownloading.set(null))).subscribe({
-      next: blob => { const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = path; anchor.click(); URL.revokeObjectURL(url); },
+    this.placementService.downloadReport(path, departmentId, this.reportAcademicYearId() ?? undefined).pipe(finalize(() => this.reportDownloading.set(null))).subscribe({
+      next: blob => { const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = this.reportFilename(path); anchor.click(); URL.revokeObjectURL(url); },
       error: error => this.errorMessage.set(this.apiError(error, 'The report could not be downloaded.')),
       complete: () => this.successMessage.set(`${path.endsWith('.xlsx') ? 'Excel' : 'CSV'} report downloaded.`)
     });
   }
   parseDepartmentId(value: string): number | undefined { return value ? Number(value) : undefined; }
+
+  private reportFilename(path: string): string {
+    const year = this.reportAcademicYears().find(item => item.id === this.reportAcademicYearId())?.label?.replace(/[^a-zA-Z0-9-]/g, '-') || 'all-years';
+    const department = this.role === 'UTPO' && this.reportDepartmentId() ? `-department-${this.reportDepartmentId()}` : '';
+    const dot = path.lastIndexOf('.');
+    return `${path.slice(0, dot)}-${year}${department}${path.slice(dot)}`;
+  }
 
   submitCompany(): void {
     if (!this.companyForm.name.trim()) {
@@ -256,15 +268,26 @@ export class StaffDashboardComponent implements OnInit {
     request.subscribe({
       next: company => {
         this.companies.update(items => this.editingCompanyId ? items.map(item => item.id === company.id ? company : item) : [...items, company]);
+        this.drives.update(items => items.map(drive => drive.company.id === company.id ? { ...drive, company } : drive));
+        this.roundDrives.update(items => items.map(drive => drive.company.id === company.id ? { ...drive, company } : drive));
+        this.selectedDrive.update(drive => drive?.company.id === company.id ? { ...drive, company } : drive);
+        this.editingCompanyId = company.id;
         const uploads = this.companyAttachmentFiles.map(file => this.placementService.uploadCompanyAttachment(company.id, file));
-        if (uploads.length) forkJoin(uploads).subscribe({ error: error => this.errorMessage.set(this.apiError(error, 'Company saved, but an attachment could not be uploaded.')) });
-        this.companyAttachmentFiles = [];
-        this.companyForm = this.emptyCompany();
-        this.showCompanyForm.set(false);
-        this.editingCompanyId = null;
-        this.finishSave('Company saved successfully.');
+        const finish = () => {
+          this.companyAttachmentFiles = [];
+          this.companyForm = this.emptyCompany();
+          this.showCompanyForm.set(false);
+          this.editingCompanyId = null;
+          this.finishSave('Company saved successfully.');
+        };
+        if (uploads.length) {
+          forkJoin(uploads).subscribe({
+            next: () => finish(),
+            error: error => this.failSave(this.apiError(error, 'Company saved, but an attachment could not be uploaded.'))
+          });
+        } else finish();
       },
-      error: error => this.failSave(this.apiError(error, 'Company could not be created. Check the details and try again.'))
+      error: error => this.failSave(this.apiError(error, 'Company could not be saved. Check the details and try again.'))
     });
   }
   editCompany(company: Company): void {

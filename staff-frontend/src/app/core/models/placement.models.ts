@@ -34,6 +34,7 @@ export interface Company {
 }
 
 export interface PlacementAttachment { id: number; fileName: string; contentType: string; sizeBytes: number; }
+export interface AcademicYear { id: number; label: string; status: string; }
 
 export interface DriveRequest {
   companyId: number;
